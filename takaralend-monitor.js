@@ -3,14 +3,15 @@
  * 監控 USDT (15.57%) 和 USDC (12.88%) 的 Supply APR
  * 
  * 用法:
- *   node dual-market-monitor.js              # 持續監控 (每 N 秒更新)
- *   node dual-market-monitor.js --once       # 單次運行
- *   node dual-market-monitor.js --stats      # 查看統計
+ *   node takaralend-monitor.js              # 持續監控 (每 N 秒更新)
+ *   node takaralend-monitor.js --once       # 單次運行
+ *   node takaralend-monitor.js --stats      # 查看統計
  */
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const historyManager = require('./history-manager');
 
 const CONFIG = {
   markets: ['USDT', 'USDC'],
@@ -36,22 +37,7 @@ function log(message) {
  */
 function saveMarketData(market, aprData) {
   try {
-    const dataFile = path.join(__dirname, `${market.toLowerCase()}-apr-history.json`);
-    let allData = [];
-    
-    if (fs.existsSync(dataFile)) {
-      const content = fs.readFileSync(dataFile, 'utf-8');
-      allData = JSON.parse(content);
-    }
-    
-    allData.push(aprData);
-    
-    // 限制為最多 1000 個數據點
-    if (allData.length > 1000) {
-      allData = allData.slice(-1000);
-    }
-    
-    fs.writeFileSync(dataFile, JSON.stringify(allData, null, 2));
+    historyManager.addEntry(market.toLowerCase(), aprData);
     return true;
   } catch (e) {
     log(`❌ 保存 ${market} 數據失敗: ${e.message}`);
@@ -159,18 +145,10 @@ function showStatistics() {
 
   CONFIG.markets.forEach(market => {
     try {
-      const dataFile = path.join(__dirname, `${market.toLowerCase()}-apr-history.json`);
-      
-      if (!fs.existsSync(dataFile)) {
-        console.log(`📊 ${market}: 暫無數據\n`);
-        return;
-      }
-
-      const content = fs.readFileSync(dataFile, 'utf-8');
-      const allData = JSON.parse(content);
+      const allData = historyManager.getStats(market.toLowerCase());
 
       if (allData.length === 0) {
-        console.log(`📊 ${market}: 暫無數據\n`);
+        console.log(`📊 ${market}: 暫無數據 (今日)\n`);
         return;
       }
 
@@ -189,7 +167,7 @@ function showStatistics() {
         console.log(`   平均: ${avg}%`);
         console.log(`   最小: ${min}%`);
         console.log(`   最大: ${max}%`);
-        console.log(`   數據點: ${supplies.length}\n`);
+        console.log(`   數據點: ${supplies.length} (今日)\n`);
       }
 
     } catch (e) {
@@ -211,7 +189,7 @@ async function startMonitoring() {
   console.log(`📝 配置:`);
   console.log(`   監控市場: USDT, USDC`);
   console.log(`   更新間隔: ${CONFIG.updateInterval / 1000} 秒鐘`);
-  console.log(`   數據文件: usdt-apr-history.json, usdc-apr-history.json\n`);
+  console.log(`   數據目錄: history/\n`);
 
   console.log('🚀 監控已啟動，按 Ctrl+C 停止\n');
 

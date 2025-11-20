@@ -3,10 +3,10 @@
  * 同時查詢 MMT Finance、TakaraLend 和 Volos UI 的 APR
  * 
  * 使用方式:
- *   node query-apr.js              # 查詢所有 APR
- *   node query-apr.js --mmt        # 只查詢 MMT
- *   node query-apr.js --takaralend # 只查詢 TakaraLend
- *   node query-apr.js --volos      # 只查詢 Volos UI
+ *   node apr-monitor.js              # 查詢所有 APR
+ *   node apr-monitor.js --mmt        # 只查詢 MMT
+ *   node apr-monitor.js --takaralend # 只查詢 TakaraLend
+ *   node apr-monitor.js --volos      # 只查詢 Volos UI
  */
 
 const puppeteer = require('puppeteer');

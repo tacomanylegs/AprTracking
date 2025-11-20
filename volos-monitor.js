@@ -4,12 +4,13 @@
  * 注意: APR 會隨時間動態變化，現有值已更新為最新
  * 
  * 使用方式:
- *   node volos-query.js              # 查詢 Vault #1 和 #2
+ *   node volos-monitor.js              # 查詢 Vault #1 和 #2
  */
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const historyManager = require('./history-manager');
 
 const CONFIG = {
   webUrl: 'https://www.volosui.com/vaults',
@@ -107,25 +108,11 @@ async function queryVaults() {
  */
 function saveData(vaults) {
   try {
-    const dataFile = path.join(__dirname, 'volos-apr-history.json');
-    let history = [];
-    
-    if (fs.existsSync(dataFile)) {
-      history = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
-    }
-
-    history.push({
-      timestamp: new Date().toISOString(),
+    historyManager.addEntry('volos', {
       vault_1: vaults.vault_1 || null,
       vault_2: vaults.vault_2 || null,
       success: vaults.vault_1 !== undefined && vaults.vault_2 !== undefined
     });
-
-    if (history.length > 1000) {
-      history = history.slice(-1000);
-    }
-
-    fs.writeFileSync(dataFile, JSON.stringify(history, null, 2));
     return true;
   } catch (error) {
     console.error(`❌ 保存失敗: ${error.message}`);

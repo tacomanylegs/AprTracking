@@ -22,57 +22,57 @@ npm install
 
 ### 1. 統一查詢工具 (推薦)
 
-使用 `query-apr.js` 可以一次查詢所有或特定協議的 APR，支援平行處理，速度最快。
+使用 `apr-monitor.js` 可以一次查詢所有或特定協議的 APR，支援平行處理，速度最快。
 
 ```bash
 # 查詢所有協議 (TakaraLend, MMT, Volos)
-node query-apr.js
+node apr-monitor.js
 
 # 只查詢 MMT Finance
-node query-apr.js --mmt
+node apr-monitor.js --mmt
 
 # 只查詢 TakaraLend (USDT & USDC)
-node query-apr.js --takaralend
+node apr-monitor.js --takaralend
 
 # 只查詢 Volos UI
-node query-apr.js --volos
+node apr-monitor.js --volos
 ```
 
 ### 2. 獨立監控工具
 
 如果您需要針對特定協議進行持續監控或查看歷史統計，可以使用以下獨立腳本。
 
-#### TakaraLend 監控 (`dual-market-monitor.js`)
+#### TakaraLend 監控 (`takaralend-monitor.js`)
 
 ```bash
 # 單次查詢
-node dual-market-monitor.js --once
+node takaralend-monitor.js --once
 
 # 持續監控 (每 5 分鐘更新)
-node dual-market-monitor.js
+node takaralend-monitor.js
 
 # 查看歷史統計
-node dual-market-monitor.js --stats
+node takaralend-monitor.js --stats
 ```
 
-#### MMT Finance 監控 (`mmt-estimated-apr-scraper.js`)
+#### MMT Finance 監控 (`mmt-monitor.js`)
 
 ```bash
 # 單次查詢
-node mmt-estimated-apr-scraper.js --once
+node mmt-monitor.js --once
 
 # 持續監控
-node mmt-estimated-apr-scraper.js
+node mmt-monitor.js
 
 # 查看歷史統計
-node mmt-estimated-apr-scraper.js --stats
+node mmt-monitor.js --stats
 ```
 
-#### Volos UI 查詢 (`volos-query.js`)
+#### Volos UI 查詢 (`volos-monitor.js`)
 
 ```bash
 # 單次查詢 Vault #1 和 #2
-node volos-query.js
+node volos-monitor.js
 ```
 
 ## 📊 數據存儲
@@ -95,11 +95,12 @@ node volos-query.js
 
 ```
 D:\Code\AprTracking
-├── query-apr.js                 # 統一查詢入口 (Main)
-├── dual-market-monitor.js       # TakaraLend 專用監控
-├── mmt-estimated-apr-scraper.js # MMT Finance 專用監控
-├── volos-query.js               # Volos UI 專用查詢
-├── *.json                       # 歷史數據文件
+├── apr-monitor.js               # 統一查詢入口 (Main)
+├── takaralend-monitor.js        # TakaraLend 專用監控
+├── mmt-monitor.js               # MMT Finance 專用監控
+├── volos-monitor.js             # Volos UI 專用查詢
+├── history/                     # 歷史數據資料夾
+├── history-manager.js           # 歷史數據管理器
 └── package.json                 # 專案配置
 ```
 

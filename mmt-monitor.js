@@ -1,14 +1,15 @@
 /**
  * MMT Finance Estimated APR 爬蟲
  * 使用方式:
- *   node mmt-estimated-apr-scraper.js --once    # 單次查詢
- *   node mmt-estimated-apr-scraper.js            # 持續監控
- *   node mmt-estimated-apr-scraper.js --stats    # 查看統計
+ *   node mmt-monitor.js --once    # 單次查詢
+ *   node mmt-monitor.js            # 持續監控
+ *   node mmt-monitor.js --stats    # 查看統計
  */
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const historyManager = require('./history-manager');
 
 const CONFIG = {
   poolId: '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
@@ -78,24 +79,10 @@ async function scrapeEstimatedAPR() {
  */
 function saveData(apr) {
   try {
-    const dataFile = path.join(__dirname, 'mmt-apr-history.json');
-    let history = [];
-    
-    if (fs.existsSync(dataFile)) {
-      history = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
-    }
-
-    history.push({
-      timestamp: new Date().toISOString(),
+    historyManager.addEntry('mmt', {
       estimatedAPR: apr,
       success: apr !== null
     });
-
-    if (history.length > 1000) {
-      history = history.slice(-1000);
-    }
-
-    fs.writeFileSync(dataFile, JSON.stringify(history, null, 2));
     return true;
   } catch (error) {
     log(`❌ 保存失敗: ${error.message}`);
@@ -108,15 +95,9 @@ function saveData(apr) {
  */
 function showStatistics() {
   try {
-    const dataFile = path.join(__dirname, 'mmt-apr-history.json');
-    if (!fs.existsSync(dataFile)) {
-      log('⚠️  還沒有數據');
-      return;
-    }
-
-    const history = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+    const history = historyManager.getStats('mmt');
     if (history.length === 0) {
-      log('⚠️  還沒有數據');
+      log('⚠️  還沒有數據 (今日)');
       return;
     }
 
@@ -131,7 +112,7 @@ function showStatistics() {
     console.log('\n╔═══════════════════════════════════════════════════════════╗');
     console.log('║              MMT Finance APR 統計信息                    ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
-    console.log(`📊 數據點: ${successData.length}`);
+    console.log(`📊 數據點: ${successData.length} (今日)`);
     console.log(`📈 當前值: ${current}%`);
     console.log(`📊 平均值: ${avg}%`);
     console.log(`⬇️  最小值: ${min}%`);
