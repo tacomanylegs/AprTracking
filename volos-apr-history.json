@@ -1,0 +1,100 @@
+[
+  {
+    "timestamp": "2025-11-20T15:34:18.349Z",
+    "vaults": {
+      "vault_1": {
+        "number": 1,
+        "apr": 7.63,
+        "text": "Log In\nEarn up to 7.63% APR on xBTC\nVaults TVL\n$55.845M\nTotal Yields\n$1.158M\nxBTC\n$32.8M TVL\n7.63%\nAPR\nStable MMT#2\n$623.8K TVL\n12.73%\nAPR\nYBTC.B\n$903.1K TVL\n3.02%\nAPR\nAll Vaults\nBTC\nStablecoin\nVaults"
+      }
+    },
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-20T15:34:40.437Z",
+    "vaults": {
+      "vault_1": {
+        "number": 1,
+        "apr": 32.38,
+        "text": "Stable Vault #1"
+      },
+      "vault_2": {
+        "number": 2,
+        "apr": 12.73,
+        "text": "Stable Vault #2"
+      }
+    },
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-20T15:35:31.665Z",
+    "vaults": [
+      {
+        "name": "Log In",
+        "apr": 7.63,
+        "text": "Earn up to 7.63% APR on xBTC"
+      }
+    ],
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-20T15:35:59.387Z",
+    "vaults": [
+      {
+        "apr": 12.73,
+        "text": "12.73%\nAPR"
+      },
+      {
+        "apr": 7.63,
+        "text": "7.63% APR"
+      },
+      {
+        "apr": 7.63,
+        "text": "7.63%\nAPR"
+      },
+      {
+        "apr": 3.02,
+        "text": "3.02%\nAPR"
+      }
+    ],
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-20T15:36:20.132Z",
+    "vaults": [
+      {
+        "apr": 12.73,
+        "text": "12.73%\nAPR"
+      },
+      {
+        "apr": 12.41,
+        "text": "12.41% APR"
+      },
+      {
+        "apr": 7.63,
+        "text": "7.63% APR"
+      },
+      {
+        "apr": 7.63,
+        "text": "7.63%\nAPR"
+      },
+      {
+        "apr": 3.02,
+        "text": "3.02%\nAPR"
+      }
+    ],
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-20T15:38:50.483Z",
+    "vault_1": 32.45,
+    "vault_12": null,
+    "success": false
+  },
+  {
+    "timestamp": "2025-11-20T15:40:13.894Z",
+    "vault_1": 32.45,
+    "vault_2": 12.68,
+    "success": true
+  }
+]
