@@ -22,57 +22,57 @@ npm install
 
 ### 1. 統一查詢工具 (推薦)
 
-使用 `apr-monitor.js` 可以一次查詢所有或特定協議的 APR，支援平行處理，速度最快。
+使用 `monitors/apr-monitor.js` 可以一次查詢所有或特定協議的 APR，支援平行處理，速度最快。
 
 ```bash
 # 查詢所有協議 (TakaraLend, MMT, Volos)
-node apr-monitor.js
+node monitors/apr-monitor.js
 
 # 只查詢 MMT Finance
-node apr-monitor.js --mmt
+node monitors/apr-monitor.js --mmt
 
 # 只查詢 TakaraLend (USDT & USDC)
-node apr-monitor.js --takaralend
+node monitors/apr-monitor.js --takaralend
 
 # 只查詢 Volos UI
-node apr-monitor.js --volos
+node monitors/apr-monitor.js --volos
 ```
 
 ### 2. 獨立監控工具
 
 如果您需要針對特定協議進行持續監控或查看歷史統計，可以使用以下獨立腳本。
 
-#### TakaraLend 監控 (`takaralend-monitor.js`)
+#### TakaraLend 監控 (`monitors/takaralend-monitor.js`)
 
 ```bash
 # 單次查詢
-node takaralend-monitor.js --once
+node monitors/takaralend-monitor.js --once
 
 # 持續監控 (每 5 分鐘更新)
-node takaralend-monitor.js
+node monitors/takaralend-monitor.js
 
 # 查看歷史統計
-node takaralend-monitor.js --stats
+node monitors/takaralend-monitor.js --stats
 ```
 
-#### MMT Finance 監控 (`mmt-monitor.js`)
+#### MMT Finance 監控 (`monitors/mmt-monitor.js`)
 
 ```bash
 # 單次查詢
-node mmt-monitor.js --once
+node monitors/mmt-monitor.js --once
 
 # 持續監控
-node mmt-monitor.js
+node monitors/mmt-monitor.js
 
 # 查看歷史統計
-node mmt-monitor.js --stats
+node monitors/mmt-monitor.js --stats
 ```
 
-#### Volos UI 查詢 (`volos-monitor.js`)
+#### Volos UI 查詢 (`monitors/volos-monitor.js`)
 
 ```bash
 # 單次查詢 Vault #1 和 #2
-node volos-monitor.js
+node monitors/volos-monitor.js
 ```
 
 ## 📊 數據存儲
@@ -95,10 +95,11 @@ node volos-monitor.js
 
 ```
 D:\Code\AprTracking
-├── apr-monitor.js               # 統一查詢入口 (Main)
-├── takaralend-monitor.js        # TakaraLend 專用監控
-├── mmt-monitor.js               # MMT Finance 專用監控
-├── volos-monitor.js             # Volos UI 專用查詢
+├── monitors/                    # 監控腳本資料夾
+│   ├── apr-monitor.js           # 統一查詢入口 (Main)
+│   ├── takaralend-monitor.js    # TakaraLend 專用監控
+│   ├── mmt-monitor.js           # MMT Finance 專用監控
+│   └── volos-monitor.js         # Volos UI 專用查詢
 ├── history/                     # 歷史數據資料夾
 ├── history-manager.js           # 歷史數據管理器
 └── package.json                 # 專案配置

@@ -10,7 +10,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
-const historyManager = require('./history-manager');
+const historyManager = require('../history-manager');
 
 const CONFIG = {
   webUrl: 'https://www.volosui.com/vaults',
