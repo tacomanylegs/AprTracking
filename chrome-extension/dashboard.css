@@ -184,14 +184,6 @@ h1 {
     color: var(--text-secondary);
 }
 
-.trend-up {
-    color: #10b981;
-}
-
-.trend-down {
-    color: #ef4444;
-}
-
 /* Chart */
 .chart-container {
     height: 400px;

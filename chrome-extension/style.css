@@ -84,7 +84,6 @@ button:disabled {
   text-decoration: none;
   font-size: 14px;
   color: #999;
-  transition: color 0.2s;
   opacity: 0.6;
 }
 
