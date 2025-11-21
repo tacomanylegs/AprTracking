@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const history = data.history || [];
 
     if (history.length === 0) {
-        document.querySelector('.chart-container').innerHTML = '<div style="text-align:center; padding: 50px; color: #666;">No history data available yet.</div>';
+        document.querySelector('.chart-container').innerHTML = '<div style="text-align:center; padding: 50px; color: #666;">目前尚無歷史數據</div>';
         return;
     }
 
@@ -33,6 +33,7 @@ class Dashboard {
         this.ctx = this.canvas.getContext('2d');
         this.timeRange = '24h'; // Default
         this.historyFilter = 'all'; // Default filter
+        this.hiddenProtocols = new Set(); // Track hidden protocols
     }
 
     init() {
@@ -59,7 +60,25 @@ class Dashboard {
 
     populateFilter() {
         const select = document.getElementById('historyFilter');
-        this.protocols.forEach(p => {
+
+        // Get latest APR for each protocol
+        const latest = this.fullHistory[this.fullHistory.length - 1];
+        const protocolAprs = {};
+
+        if (latest && latest.records) {
+            latest.records.forEach(r => {
+                protocolAprs[r.name] = r.apr;
+            });
+        }
+
+        // Sort protocols by latest APR (descending)
+        const sortedProtocols = [...this.protocols].sort((a, b) => {
+            const aprA = protocolAprs[a] || 0;
+            const aprB = protocolAprs[b] || 0;
+            return aprB - aprA;
+        });
+
+        sortedProtocols.forEach(p => {
             const option = document.createElement('option');
             option.value = p;
             option.textContent = p;
@@ -122,20 +141,7 @@ class Dashboard {
         // 1. Highest APR Now
         const maxNow = latest.records.reduce((prev, current) => (prev.apr > current.apr) ? prev : current, { apr: 0 });
 
-        // 2. Average APR (All protocols, filtered time)
-        let totalApr = 0;
-        let count = 0;
-        this.filteredHistory.forEach(h => {
-            if (h.records) {
-                h.records.forEach(r => {
-                    totalApr += r.apr;
-                    count++;
-                });
-            }
-        });
-        const avgApr = count > 0 ? (totalApr / count).toFixed(2) : 0;
-
-        // 3. Best Protocol (Most frequently top)
+        // 2. Best Protocol (Most frequently top)
         const topCounts = {};
         this.filteredHistory.forEach(h => {
             if (h.records && h.records.length > 0) {
@@ -152,18 +158,23 @@ class Dashboard {
             }
         }
 
-        this.createStatCard(grid, 'Highest APR (Now)', `${maxNow.apr}%`, maxNow.name);
-        this.createStatCard(grid, 'Avg APR (Period)', `${avgApr}%`, 'All Protocols');
-        this.createStatCard(grid, 'Dominant Protocol', bestProtocol, 'Most frequently top');
+        this.createStatCard(grid, '當前最高收益率', `${maxNow.apr}%`, maxNow.name, maxNow.url);
+        this.createStatCard(grid, '優勢協議', bestProtocol, '最常領先');
     }
 
-    createStatCard(container, title, value, subtext) {
+    createStatCard(container, title, value, subtext, url = null) {
         const div = document.createElement('div');
         div.className = 'stat-card';
+
+        let subtextContent = subtext;
+        if (url) {
+            subtextContent = `<a href="${url}" target="_blank" style="text-decoration: none; color: inherit; cursor: pointer;">${subtext}</a>`;
+        }
+
         div.innerHTML = `
       <div class="stat-title">${title}</div>
       <div class="stat-value">${value}</div>
-      <div class="stat-trend">${subtext}</div>
+      <div class="stat-trend">${subtextContent}</div>
     `;
         container.appendChild(div);
     }
@@ -174,13 +185,22 @@ class Dashboard {
         this.protocols.forEach(p => {
             const div = document.createElement('div');
             div.className = 'legend-item';
+            if (this.hiddenProtocols.has(p)) {
+                div.classList.add('hidden');
+            }
             div.innerHTML = `
         <div class="legend-color" style="background: ${this.protocolColors[p]}"></div>
         <span>${p}</span>
       `;
             div.addEventListener('click', () => {
-                div.classList.toggle('hidden');
-                // Re-draw chart with hidden lines logic (omitted for brevity, but could be added)
+                if (this.hiddenProtocols.has(p)) {
+                    this.hiddenProtocols.delete(p);
+                    div.classList.remove('hidden');
+                } else {
+                    this.hiddenProtocols.add(p);
+                    div.classList.add('hidden');
+                }
+                this.drawChart();
             });
             legend.appendChild(div);
         });
@@ -189,15 +209,19 @@ class Dashboard {
     renderTable() {
         const tbody = document.querySelector('#historyTable tbody');
         tbody.innerHTML = '';
+        const avgDisplay = document.getElementById('avgAprDisplay');
 
         // Show last 20 entries reversed
         const displayData = [...this.filteredHistory].reverse().slice(0, 20);
 
-        displayData.forEach(h => {
-            if (!h.records) return;
+        if (this.historyFilter === 'all') {
+            // Hide average APR for "all"
+            avgDisplay.style.display = 'none';
 
-            if (this.historyFilter === 'all') {
-                // If all, show all protocols for this timestamp
+            // If all, show all protocols for each timestamp
+            displayData.forEach(h => {
+                if (!h.records) return;
+
                 const sortedRecords = [...h.records].sort((a, b) => b.apr - a.apr);
                 const date = new Date(h.timestamp);
                 const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
@@ -216,28 +240,55 @@ class Dashboard {
                     `;
                     tbody.appendChild(tr);
                 });
-            } else {
-                // If specific protocol, find it
+            });
+        } else {
+            // If specific protocol, collect all records and sort by APR
+            const records = [];
+            displayData.forEach(h => {
+                if (!h.records) return;
                 const targetRecord = h.records.find(r => r.name === this.historyFilter);
-                if (!targetRecord) return; // Skip if protocol not found in this history entry
+                if (targetRecord) {
+                    records.push({
+                        timestamp: h.timestamp,
+                        record: targetRecord
+                    });
+                }
+            });
 
+            // Calculate and display average APR for this protocol
+            let totalApr = 0;
+            this.filteredHistory.forEach(h => {
+                if (h.records) {
+                    const r = h.records.find(rec => rec.name === this.historyFilter);
+                    if (r) totalApr += r.apr;
+                }
+            });
+            const avgApr = records.length > 0 ? (totalApr / records.length).toFixed(2) : 0;
+            avgDisplay.textContent = `（平均: ${avgApr}%）`;
+            avgDisplay.style.display = 'inline';
+
+            // Sort by APR descending
+            records.sort((a, b) => b.record.apr - a.record.apr);
+
+            // Render sorted records
+            records.forEach(item => {
                 const tr = document.createElement('tr');
-                const date = new Date(h.timestamp);
+                const date = new Date(item.timestamp);
                 const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
 
                 tr.innerHTML = `
                     <td>${timeStr}</td>
                     <td>
                       <div class="protocol-cell">
-                        <div class="legend-color" style="background: ${this.protocolColors[targetRecord.name]}"></div>
-                        ${targetRecord.name}
+                        <div class="legend-color" style="background: ${this.protocolColors[item.record.name]}"></div>
+                        ${item.record.name}
                       </div>
                     </td>
-                    <td class="apr-cell">${targetRecord.apr}%</td>
+                    <td class="apr-cell">${item.record.apr}%</td>
                 `;
                 tbody.appendChild(tr);
-            }
-        });
+            });
+        }
     }
 
     drawChart(highlightIndex = -1) {
@@ -292,6 +343,9 @@ class Dashboard {
 
         // Draw Lines
         this.protocols.forEach(protocol => {
+            // Skip if protocol is hidden
+            if (this.hiddenProtocols.has(protocol)) return;
+
             const points = [];
             this.filteredHistory.forEach((h, i) => {
                 const record = h.records ? h.records.find(r => r.name === protocol) : null;

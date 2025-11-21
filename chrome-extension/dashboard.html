@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DeFi APR Dashboard</title>
+  <title>DeFi 年化收益率儀表板</title>
   <link rel="stylesheet" href="dashboard.css">
 </head>
 
@@ -12,16 +12,16 @@
   <div class="app-container">
     <header>
       <div class="logo-section">
-        <h1>APR Analytics</h1>
-        <span class="live-indicator">LIVE</span>
+        <h1>收益率分析</h1>
+        <span class="live-indicator">即時</span>
       </div>
       <div class="time-range-selector">
-        <button class="range-btn" data-range="1h">1H</button>
-        <button class="range-btn" data-range="6h">6H</button>
-        <button class="range-btn" data-range="12h">12H</button>
-        <button class="range-btn active" data-range="24h">24H</button>
-        <button class="range-btn" data-range="7d">7D</button>
-        <button class="range-btn" data-range="all">ALL</button>
+        <button class="range-btn" data-range="1h">1小時</button>
+        <button class="range-btn" data-range="6h">6小時</button>
+        <button class="range-btn" data-range="12h">12小時</button>
+        <button class="range-btn active" data-range="24h">24小時</button>
+        <button class="range-btn" data-range="7d">7天</button>
+        <button class="range-btn" data-range="all">全部</button>
       </div>
     </header>
 
@@ -32,7 +32,7 @@
 
       <div class="chart-container glass-panel">
         <div class="chart-header">
-          <h2>APR Trend</h2>
+          <h2>年化收益率走勢</h2>
           <div class="legend" id="chartLegend"></div>
         </div>
         <canvas id="aprChart"></canvas>
@@ -40,18 +40,21 @@
 
       <div class="history-table-container glass-panel">
         <div class="section-header">
-          <h2>Recent History</h2>
+          <div>
+            <h2>歷史紀錄<span id="avgAprDisplay"
+                style="display: none; margin-left: 12px; font-size: 0.9em; color: #10B981;"></span></h2>
+          </div>
           <select id="historyFilter">
-            <option value="all">All Protocols</option>
+            <option value="all">所有協議</option>
           </select>
         </div>
         <div class="table-wrapper">
           <table id="historyTable">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Protocol</th>
-                <th>APR</th>
+                <th>時間</th>
+                <th>協議</th>
+                <th>年化收益率</th>
               </tr>
             </thead>
             <tbody>
