@@ -104,6 +104,48 @@ h1 {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.protocol-links-container {
+    margin: 20px 0;
+    padding: 0 0 20px 0;
+    border-bottom: var(--glass-border);
+}
+
+#protocolLinks {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.protocol-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.protocol-link-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.protocol-link-btn-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
 .range-btn {
     background: transparent;
     border: none;

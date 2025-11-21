@@ -39,6 +39,7 @@ class Dashboard {
     init() {
         this.setupEventListeners();
         this.populateFilter();
+        this.renderProtocolLinks();
         this.filterData();
         this.renderStats();
         this.renderLegend();
@@ -84,6 +85,43 @@ class Dashboard {
             option.textContent = p;
             select.appendChild(option);
         });
+    }
+
+    renderProtocolLinks() {
+        const container = document.getElementById('protocolLinks');
+        container.innerHTML = '';
+
+        // Get unique protocols with their URLs and latest APR from latest data
+        const latest = this.fullHistory[this.fullHistory.length - 1];
+        const protocolsWithUrls = new Map();
+
+        if (latest && latest.records) {
+            latest.records.forEach(record => {
+                if (record.url && !protocolsWithUrls.has(record.name)) {
+                    protocolsWithUrls.set(record.name, {
+                        name: record.name,
+                        url: record.url,
+                        color: this.protocolColors[record.name],
+                        apr: record.apr
+                    });
+                }
+            });
+        }
+
+        // Sort by APR (descending) and render links
+        Array.from(protocolsWithUrls.values())
+            .sort((a, b) => b.apr - a.apr)
+            .forEach(protocol => {
+                const link = document.createElement('a');
+                link.href = protocol.url;
+                link.target = '_blank';
+                link.className = 'protocol-link-btn';
+                link.innerHTML = `
+                    <span class="protocol-link-btn-dot" style="background-color: ${protocol.color}"></span>
+                    ${protocol.name}
+                `;
+                container.appendChild(link);
+            });
     }
 
     setupEventListeners() {
@@ -138,7 +176,8 @@ class Dashboard {
 
         for (let i = 0; i < count; i++) {
             const index = Math.floor((i / (count - 1)) * (history.length - 1));
-            const timestamp = history[index].timestamp;
+            const reverseIndex = history.length - 1 - index;
+            const timestamp = history[reverseIndex].timestamp;
             const date = new Date(timestamp);
             
             // Format time - show hour:minute
@@ -150,7 +189,7 @@ class Dashboard {
             
             labels.push({
                 time: timeStr,
-                ratio: index / (history.length - 1)
+                ratio: i / (count - 1)
             });
         }
         
@@ -406,14 +445,20 @@ class Dashboard {
             if (this.hiddenProtocols.has(protocol)) return;
 
             const points = [];
-            this.filteredHistory.forEach((h, i) => {
+            const historyLength = this.filteredHistory.length;
+            
+            // 反序遍歷，使最新數據在左邊
+            for (let i = historyLength - 1; i >= 0; i--) {
+                const h = this.filteredHistory[i];
                 const record = h.records ? h.records.find(r => r.name === protocol) : null;
                 if (record) {
-                    const x = padding.left + (i / (this.filteredHistory.length - 1)) * chartWidth;
+                    // 計算 x 位置：從右往左遍歷，所以用 (historyLength - 1 - i) 作為索引
+                    const xIndex = historyLength - 1 - i;
+                    const x = padding.left + (xIndex / (historyLength - 1)) * chartWidth;
                     const y = padding.top + chartHeight - (record.apr / maxApr) * chartHeight;
                     points.push({ x, y });
                 }
-            });
+            }
 
             if (points.length > 0) {
                 ctx.strokeStyle = this.protocolColors[protocol];
@@ -465,7 +510,9 @@ class Dashboard {
     }
 
     drawTooltip(ctx, x, index) {
-        const data = this.filteredHistory[index];
+        // 將索引反轉以獲取正確的數據
+        const reverseIndex = this.filteredHistory.length - 1 - index;
+        const data = this.filteredHistory[reverseIndex];
         if (!data || !data.records) return;
 
         const date = new Date(data.timestamp);
@@ -474,12 +521,18 @@ class Dashboard {
         // Sort records by APR
         const sorted = [...data.records].sort((a, b) => b.apr - a.apr);
 
-        const boxWidth = 160;
+        const boxWidth = 220;
         const boxHeight = 30 + (sorted.length * 20);
+        
+        // 獲取邏輯像素寬度
+        const container = this.canvas.parentElement;
+        const logicalWidth = container.clientWidth;
+        
         let boxX = x + 10;
         let boxY = 20;
 
-        if (boxX + boxWidth > this.canvas.width) {
+        // 如果右邊會超出，改成顯示在左邊
+        if (boxX + boxWidth > logicalWidth - 20) {
             boxX = x - boxWidth - 10;
         }
 
@@ -508,12 +561,26 @@ class Dashboard {
             ctx.arc(boxX + 15, y - 4, 3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Name
+            // Name (truncate if too long)
             ctx.fillStyle = '#1e293b';
-            ctx.fillText(item.name, boxX + 25, y);
+            ctx.font = '11px Inter';
+            const maxNameWidth = boxWidth - 50;
+            let displayName = item.name;
+            
+            // 簡單的截斷邏輯：如果名稱太長，添加省略號
+            while (ctx.measureText(displayName).width > maxNameWidth && displayName.length > 0) {
+                displayName = displayName.slice(0, -1);
+            }
+            if (item.name.length > displayName.length) {
+                displayName = displayName.slice(0, -2) + '..';
+            }
+            
+            ctx.textAlign = 'left';
+            ctx.fillText(displayName, boxX + 25, y);
 
             // Value
             ctx.textAlign = 'right';
+            ctx.font = '11px Inter';
             ctx.fillText(item.apr.toFixed(2) + '%', boxX + boxWidth - 10, y);
             ctx.textAlign = 'left';
         });
