@@ -218,6 +218,34 @@ async function startMonitoring() {
 }
 
 /**
+ * 獲取單個市場 APR (供外部調用)
+ */
+async function getAPR(market) {
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    // Map 'usdt' to 'USDT' etc.
+    const marketKey = market.toUpperCase();
+    if (!CONFIG.urls[marketKey]) {
+      throw new Error(`Unknown market: ${market}`);
+    }
+
+    const data = await scrapeMarket(marketKey, browser);
+    return data && data.supplyAPR ? parseFloat(data.supplyAPR) : null;
+
+  } catch (error) {
+    log(`❌ 查詢 ${market} 失敗: ${error.message}`);
+    return null;
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
+/**
  * 主函數
  */
 async function main() {
@@ -235,4 +263,11 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+module.exports = {
+  getAPR,
+  scrapeAllMarkets
+};

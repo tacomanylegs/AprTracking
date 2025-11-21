@@ -1,4 +1,4 @@
-/**
+  /**
  * 統一 APR 查詢工具
  * 同時查詢 MMT Finance、TakaraLend 和 Volos UI 的 APR
  * 
@@ -10,77 +10,23 @@
  */
 
 const puppeteer = require('puppeteer');
+const mmtMonitor = require('./mmt-monitor');
+const takaralendMonitor = require('./takaralend-monitor');
+const volosMonitor = require('./volos-monitor');
 
 const CONFIG = {
-  mmt: {
-    name: 'MMT Finance',
-    webUrl: 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-    timeout: 30000
-  },
-  takaralend: {
-    usdt: {
-      name: 'TakaraLend USDT',
-      webUrl: 'https://app.takaralend.com/market/USD%E2%82%AE0',
-      timeout: 30000
-    },
-    usdc: {
-      name: 'TakaraLend USDC',
-      webUrl: 'https://app.takaralend.com/market/USDC',
-      timeout: 30000
-    }
-  },
-  volos: {
-    name: 'Volos UI Vaults',
-    webUrl: 'https://www.volosui.com/vaults',
-    timeout: 30000
-  }
+  // Config is now handled in individual monitors
 };
 
 /**
  * 查詢 MMT Finance APR
  */
 async function queryMMT() {
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
-    
-    await page.goto(CONFIG.mmt.webUrl, { 
-      waitUntil: 'networkidle2', 
-      timeout: CONFIG.mmt.timeout 
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    const apr = await page.evaluate(() => {
-      const pageText = document.body.innerText;
-      // 尋找 "Estimated APR:" 後面的百分比數值
-      // 匹配模式: Estimated APR: [換行或空白] 數值%
-      const match = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
-      
-      if (match && match[1]) {
-        return parseFloat(match[1]);
-      }
-      return null;
-    });
-
-    if (apr !== null) {
-      return apr;
-    }
-
-    return null;
-
+    return await mmtMonitor.scrapeEstimatedAPR();
   } catch (error) {
     console.error(`❌ MMT 查詢失敗: ${error.message}`);
     return null;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
@@ -88,54 +34,11 @@ async function queryMMT() {
  * 查詢 TakaraLend APR
  */
 async function queryTakaraLend(market) {
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
-    
-    const config = market === 'usdt' ? CONFIG.takaralend.usdt : CONFIG.takaralend.usdc;
-    
-    await page.goto(config.webUrl, { 
-      waitUntil: 'networkidle2', 
-      timeout: config.timeout 
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // 通過 evaluate 在頁面上執行 JavaScript 提取數據
-    const apr = await page.evaluate(() => {
-      const pageText = document.body.innerText;
-      
-      // 多種提取模式
-      const patterns = [
-        /Supply\s+info[\s\S]*?APR[\s\n]*([0-9.]+)%/i,
-        /Total[\s\S]*?Supply[\s\S]*?APR[\s\n]*([0-9.]+)%/i,
-        /Supply[\s\S]*?APR[\s\n]*([0-9.]+)%/i
-      ];
-
-      for (const pattern of patterns) {
-        const match = pageText.match(pattern);
-        if (match && match[1]) {
-          return parseFloat(match[1]);
-        }
-      }
-
-      return null;
-    });
-
-    return apr;
-
+    return await takaralendMonitor.getAPR(market);
   } catch (error) {
     console.error(`❌ TakaraLend ${market.toUpperCase()} 查詢失敗: ${error.message}`);
     return null;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
@@ -143,71 +46,11 @@ async function queryTakaraLend(market) {
  * 查詢 Volos UI Vaults APR
  */
 async function queryVolosVaults() {
-  let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
-    
-    await page.goto(CONFIG.volos.webUrl, { 
-      waitUntil: 'networkidle2', 
-      timeout: CONFIG.volos.timeout 
-    });
-
-    // 滾動頁面以加載所有 vault
-    await page.evaluate(() => {
-      window.scrollBy(0, window.innerHeight);
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // 提取頁面文本並解析 vault APR
-    const results = await page.evaluate(() => {
-      const pageText = document.body.innerText;
-      const lines = pageText.split('\n');
-      const results = {};
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // Vault #1 檢測
-        if (line.match(/Stable\s+Vault\s+#1\b/)) {
-          for (let j = 1; j <= 10 && i + j < lines.length; j++) {
-            const percentMatch = lines[i + j].match(/(\d+\.\d+)%/);
-            if (percentMatch) {
-              results.vault_1 = parseFloat(percentMatch[1]);
-              break;
-            }
-          }
-        }
-
-        // Vault #2 檢測（排除 #12, #20, #21, #22）
-        if (line.match(/Stable\s+Vault\s+#2\b/) && !line.includes('#12') && !line.includes('#20') && !line.includes('#21') && !line.includes('#22')) {
-          for (let j = 1; j <= 10 && i + j < lines.length; j++) {
-            const percentMatch = lines[i + j].match(/(\d+\.\d+)%/);
-            if (percentMatch) {
-              results.vault_2 = parseFloat(percentMatch[1]);
-              break;
-            }
-          }
-        }
-      }
-
-      return results;
-    });
-
-    return results;
-
+    return await volosMonitor.queryVaults();
   } catch (error) {
     console.error(`❌ Volos UI 查詢失敗: ${error.message}`);
     return { vault_1: null, vault_2: null };
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
