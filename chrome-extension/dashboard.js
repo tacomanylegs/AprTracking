@@ -130,6 +130,33 @@ class Dashboard {
         this.filteredHistory = this.fullHistory.filter(h => h.timestamp >= cutoff);
     }
 
+    generateTimeLabels(history, chartWidth) {
+        const labels = [];
+        const count = Math.min(5, history.length);
+        
+        if (count === 0) return labels;
+
+        for (let i = 0; i < count; i++) {
+            const index = Math.floor((i / (count - 1)) * (history.length - 1));
+            const timestamp = history[index].timestamp;
+            const date = new Date(timestamp);
+            
+            // Format time - show hour:minute
+            const timeStr = date.toLocaleTimeString('zh-TW', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            
+            labels.push({
+                time: timeStr,
+                ratio: index / (history.length - 1)
+            });
+        }
+        
+        return labels;
+    }
+
     renderStats() {
         const grid = document.getElementById('statsGrid');
         grid.innerHTML = '';
@@ -358,6 +385,20 @@ class Dashboard {
             ctx.fillText(labelVal + '%', padding.left - 8, y + 3);
         }
         ctx.stroke();
+
+        // Draw X-axis time labels
+        const timeLabels = this.generateTimeLabels(this.filteredHistory, width - padding.left - padding.right);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        
+        timeLabels.forEach(label => {
+            const xPos = padding.left + label.ratio * chartWidth;
+            // 只顯示不會超出右邊界的標籤 (留 20px 空間)
+            if (xPos + 20 <= width - padding.right) {
+                ctx.fillText(label.time, xPos, height - padding.bottom + 15);
+            }
+        });
 
         // Draw Lines
         this.protocols.forEach(protocol => {
