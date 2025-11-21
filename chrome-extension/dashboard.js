@@ -294,7 +294,7 @@ class Dashboard {
             // Hide average APR for "all"
             avgDisplay.style.display = 'none';
 
-            // If all, show all protocols for each timestamp
+            // If all, show all protocols for each timestamp with collapsible groups
             displayData.forEach(h => {
                 if (!h.records) return;
 
@@ -302,24 +302,143 @@ class Dashboard {
                 const date = new Date(h.timestamp);
                 const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
 
+                // Create header row
+                const headerTr = document.createElement('tr');
+                const contentCell = document.createElement('td');
+                contentCell.colSpan = 3;
+                contentCell.style.padding = '0';
+                contentCell.style.borderBottom = 'none';
+
+                const headerDiv = document.createElement('div');
+                headerDiv.style.display = 'flex';
+                headerDiv.style.padding = '12px 16px';
+                headerDiv.style.alignItems = 'flex-start';
+                headerDiv.style.gap = '0';
+                headerDiv.style.cursor = 'pointer';
+                headerDiv.style.transition = 'background-color 0.2s';
+
+                const timeCol = document.createElement('div');
+                timeCol.style.width = '30%';
+                timeCol.style.textAlign = 'left';
+                timeCol.style.flexShrink = '0';
+                timeCol.style.pointerEvents = 'auto';
+                timeCol.textContent = timeStr;
+
+                const protocolCol = document.createElement('div');
+                protocolCol.style.width = '40%';
+                protocolCol.style.flexShrink = '0';
+                protocolCol.style.pointerEvents = 'auto';
+                
+                const aprCol = document.createElement('div');
+                aprCol.style.width = '30%';
+                aprCol.style.textAlign = 'right';
+                aprCol.style.flexShrink = '0';
+                aprCol.style.borderLeft = '2px solid var(--border-color)';
+                aprCol.style.paddingLeft = '16px';
+                aprCol.style.marginLeft = '16px';
+                aprCol.style.pointerEvents = 'auto';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'time-group-content collapsed';
+                
+                // Add click handler to toggle expand
+                const toggleExpand = () => {
+                    contentDiv.classList.toggle('collapsed');
+                    const items = contentDiv.querySelectorAll('.protocol-item');
+                    items.forEach((item, idx) => {
+                        if (idx >= 2) {
+                            item.style.display = contentDiv.classList.contains('collapsed') ? 'none' : 'flex';
+                        }
+                    });
+                };
+                
+                // Add hover effects to header row
+                headerDiv.addEventListener('mouseenter', () => {
+                    headerDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+                });
+                headerDiv.addEventListener('mouseleave', () => {
+                    headerDiv.style.backgroundColor = 'transparent';
+                });
+                
+                // Click anywhere on header row to toggle expand/collapse
+                headerDiv.addEventListener('click', toggleExpand);
+
                 sortedRecords.forEach((record, index) => {
-                    const tr = document.createElement('tr');
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'protocol-item';
+                    itemDiv.style.display = index >= 2 ? 'none' : 'flex';
+                    itemDiv.style.alignItems = 'center';
+                    itemDiv.style.gap = '0';
+                    itemDiv.style.padding = '8px 0';
+
                     const protocolNameHtml = record.url 
                         ? `<a href="${record.url}" target="_blank" class="protocol-link">${record.name}</a>` 
                         : record.name;
 
-                    tr.innerHTML = `
-                        <td>${index === 0 ? timeStr : ''}</td>
-                        <td>
-                          <div class="protocol-cell">
-                            <div class="legend-color" style="background: ${this.protocolColors[record.name]}"></div>
-                            ${protocolNameHtml}
-                          </div>
-                        </td>
-                        <td class="apr-cell">${record.apr}%</td>
-                    `;
-                    tbody.appendChild(tr);
+                    const colorDot = document.createElement('div');
+                    colorDot.className = 'legend-color';
+                    colorDot.style.background = this.protocolColors[record.name];
+                    colorDot.style.flexShrink = '0';
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.innerHTML = protocolNameHtml;
+                    nameSpan.style.flex = '1';
+                    nameSpan.style.minWidth = '0';
+                    nameSpan.style.marginLeft = '12px';
+                    nameSpan.style.pointerEvents = 'auto';
+
+                    const aprSpan = document.createElement('span');
+                    aprSpan.className = 'apr-cell';
+                    aprSpan.textContent = `${record.apr}%`;
+                    aprSpan.style.fontFamily = "'Roboto Mono', monospace";
+                    aprSpan.style.fontWeight = '600';
+                    aprSpan.style.color = 'var(--accent-color)';
+                    aprSpan.style.width = 'auto';
+                    aprSpan.style.textAlign = 'right';
+                    aprSpan.style.flexShrink = '0';
+                    aprSpan.style.marginLeft = '16px';
+                    
+                    // Make first item clickable to toggle
+                    if (index === 0) {
+                        aprSpan.style.cursor = 'pointer';
+                        aprSpan.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            toggleExpand();
+                        });
+                    }
+
+                    // Create protocol section
+                    const protocolSection = document.createElement('div');
+                    protocolSection.style.display = 'flex';
+                    protocolSection.style.width = '40%';
+                    protocolSection.style.alignItems = 'center';
+                    protocolSection.style.gap = '0';
+                    protocolSection.appendChild(colorDot);
+                    protocolSection.appendChild(nameSpan);
+
+                    // Create APR section
+                    const aprSection = document.createElement('div');
+                    aprSection.style.display = 'flex';
+                    aprSection.style.width = '30%';
+                    aprSection.style.alignItems = 'center';
+                    aprSection.style.justifyContent = 'flex-end';
+                    aprSection.style.borderLeft = '2px solid var(--border-color)';
+                    aprSection.style.paddingLeft = '16px';
+                    aprSection.style.marginLeft = '16px';
+                    aprSection.appendChild(aprSpan);
+
+                    itemDiv.appendChild(protocolSection);
+                    itemDiv.appendChild(aprSection);
+                    contentDiv.appendChild(itemDiv);
                 });
+
+                protocolCol.appendChild(contentDiv);
+                headerDiv.appendChild(timeCol);
+                headerDiv.appendChild(protocolCol);
+                headerDiv.appendChild(aprCol);
+                contentCell.appendChild(headerDiv);
+                headerTr.appendChild(contentCell);
+                tbody.appendChild(headerTr);
             });
         } else {
             // If specific protocol, collect all records and sort by APR

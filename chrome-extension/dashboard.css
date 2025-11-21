@@ -338,6 +338,47 @@ tr:hover td {
     background: rgba(0, 0, 0, 0.02);
 }
 
+.time-group-header {
+    display: table-row;
+}
+
+.time-group-header td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.time-group-header td:first-child {
+    width: 15%;
+    vertical-align: top;
+}
+
+.time-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.time-group-content.collapsed {
+    max-height: none;
+    overflow: visible;
+}
+
+.protocol-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: none;
+    cursor: default;
+    font-size: 14px;
+}
+
+.protocol-item:hover {
+    background: transparent;
+}
+
 .protocol-cell {
     display: flex;
     align-items: center;
