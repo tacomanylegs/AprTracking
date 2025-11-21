@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeFi APR Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <header>
+      <div class="logo-section">
+        <h1>APR Analytics</h1>
+        <span class="live-indicator">LIVE</span>
+      </div>
+      <div class="time-range-selector">
+        <button class="range-btn" data-range="1h">1H</button>
+        <button class="range-btn" data-range="6h">6H</button>
+        <button class="range-btn" data-range="12h">12H</button>
+        <button class="range-btn active" data-range="24h">24H</button>
+        <button class="range-btn" data-range="7d">7D</button>
+        <button class="range-btn" data-range="all">ALL</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="stats-grid" id="statsGrid">
+        <!-- Stats cards will be injected here -->
+      </div>
+
+      <div class="chart-container glass-panel">
+        <div class="chart-header">
+          <h2>APR Trend</h2>
+          <div class="legend" id="chartLegend"></div>
+        </div>
+        <canvas id="aprChart"></canvas>
+      </div>
+
+      <div class="history-table-container glass-panel">
+        <div class="section-header">
+          <h2>Recent History</h2>
+          <select id="historyFilter">
+            <option value="all">All Protocols</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table id="historyTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Protocol</th>
+                <th>APR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Rows injected here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="dashboard.js"></script>
+</body>
+
+</html>

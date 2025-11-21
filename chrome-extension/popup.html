@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>DeFi APR Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="container">
+    <h2>DeFi APR Tracker</h2>
+    <div class="actions">
+      <button id="scanBtn">🔄 立即刷新</button>
+      <button id="dashboardBtn" class="secondary-btn">📊 查看歷史走勢</button>
+    </div>
+
+    <div id="results" class="results-list">
+      <!-- 結果將動態插入這裡 -->
+      <div class="placeholder">載入中...</div>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+
+</html>
