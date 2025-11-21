@@ -159,21 +159,31 @@ class Dashboard {
         }
 
         this.createStatCard(grid, '當前最高收益率', `${maxNow.apr}%`, maxNow.name, maxNow.url);
-        this.createStatCard(grid, '優勢協議', bestProtocol, '最常領先');
+        // Find URL for the best protocol
+        const bestRecord = latest.records.find(r => r.name === bestProtocol);
+        const bestUrl = bestRecord ? bestRecord.url : null;
+        this.createStatCard(grid, '優勢協議', bestProtocol, '最常領先', bestUrl);
     }
 
-    createStatCard(container, title, value, subtext, url = null) {
+    createStatCard(container, title, value, subtext, valueUrl = null, subtextUrl = null) {
         const div = document.createElement('div');
         div.className = 'stat-card';
 
+        // Prepare value content (clickable if URL provided)
+        let valueContent = value;
+        if (valueUrl) {
+            valueContent = `<a href="${valueUrl}" target="_blank" style="text-decoration: none; color: inherit; cursor: pointer;">${value}</a>`;
+        }
+
+        // Prepare subtext content (clickable if URL provided)
         let subtextContent = subtext;
-        if (url) {
-            subtextContent = `<a href="${url}" target="_blank" style="text-decoration: none; color: inherit; cursor: pointer;">${subtext}</a>`;
+        if (subtextUrl) {
+            subtextContent = `<a href="${subtextUrl}" target="_blank" style="text-decoration: none; color: inherit; cursor: pointer;">${subtext}</a>`;
         }
 
         div.innerHTML = `
       <div class="stat-title">${title}</div>
-      <div class="stat-value">${value}</div>
+      <div class="stat-value">${valueContent}</div>
       <div class="stat-trend">${subtextContent}</div>
     `;
         container.appendChild(div);
