@@ -25,9 +25,19 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  const data = await chrome.storage.local.get(['results']);
-  if (data.results) {
-    updateBadge(data.results);
+  const data = await chrome.storage.local.get(['history']);
+  if (data.history && data.history.length > 0) {
+    // 取得最新一筆歷史紀錄的結果
+    const latestEntry = data.history[data.history.length - 1];
+    if (latestEntry.records) {
+      updateBadge(latestEntry.records);
+      return;
+    }
+  }
+  // 若沒有歷史紀錄，則顯示現有的 results
+  const resultsData = await chrome.storage.local.get(['results']);
+  if (resultsData.results) {
+    updateBadge(resultsData.results);
   }
 });
 

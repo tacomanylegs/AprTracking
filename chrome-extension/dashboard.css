@@ -310,6 +310,12 @@ tr:hover td {
     gap: 8px;
 }
 
+.protocol-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
 .apr-cell {
     font-family: 'Roboto Mono', monospace;
     font-weight: 600;

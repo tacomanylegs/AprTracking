@@ -238,12 +238,16 @@ class Dashboard {
 
                 sortedRecords.forEach((record, index) => {
                     const tr = document.createElement('tr');
+                    const protocolNameHtml = record.url 
+                        ? `<a href="${record.url}" target="_blank" class="protocol-link">${record.name}</a>` 
+                        : record.name;
+
                     tr.innerHTML = `
                         <td>${index === 0 ? timeStr : ''}</td>
                         <td>
                           <div class="protocol-cell">
                             <div class="legend-color" style="background: ${this.protocolColors[record.name]}"></div>
-                            ${record.name}
+                            ${protocolNameHtml}
                           </div>
                         </td>
                         <td class="apr-cell">${record.apr}%</td>
@@ -286,12 +290,16 @@ class Dashboard {
                 const date = new Date(item.timestamp);
                 const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
 
+                const protocolNameHtml = item.record.url 
+                    ? `<a href="${item.record.url}" target="_blank" class="protocol-link">${item.record.name}</a>` 
+                    : item.record.name;
+
                 tr.innerHTML = `
                     <td>${timeStr}</td>
                     <td>
                       <div class="protocol-cell">
                         <div class="legend-color" style="background: ${this.protocolColors[item.record.name]}"></div>
-                        ${item.record.name}
+                        ${protocolNameHtml}
                       </div>
                     </td>
                     <td class="apr-cell">${item.record.apr}%</td>
