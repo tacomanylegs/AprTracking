@@ -136,29 +136,48 @@ async function main() {
   // 等待所有查詢完成
   await Promise.all(promises);
 
+  // 整理結果並排序
+  const summaryList = [];
+
+  if (results.mmt !== undefined) {
+    summaryList.push({ name: 'MMT Finance', apr: results.mmt });
+  }
+  if (results.usdt !== undefined) {
+    summaryList.push({ name: 'TakaraLend USDT', apr: results.usdt });
+  }
+  if (results.usdc !== undefined) {
+    summaryList.push({ name: 'TakaraLend USDC', apr: results.usdc });
+  }
+  if (results.vault_1 !== undefined) {
+    summaryList.push({ name: 'Volos Vault #1', apr: results.vault_1 });
+  }
+  if (results.vault_2 !== undefined) {
+    summaryList.push({ name: 'Volos Vault #2', apr: results.vault_2 });
+  }
+
+  // 排序: APR 高到低，null 排最後
+  summaryList.sort((a, b) => {
+    if (a.apr === null && b.apr === null) return 0;
+    if (a.apr === null) return 1;
+    if (b.apr === null) return -1;
+    return b.apr - a.apr;
+  });
+
   // 顯示摘要
   console.log('\n' + '═'.repeat(60));
-  console.log('📊 查詢結果摘要:\n');
-  
-  if (results.mmt !== undefined) {
-    console.log(`MMT Finance:     ${results.mmt !== null ? results.mmt + '%' : '❌ 查詢失敗'}`);
-  }
-  
-  if (results.usdt !== undefined) {
-    console.log(`TakaraLend USDT: ${results.usdt !== null ? results.usdt + '%' : '❌ 查詢失敗'}`);
-  }
-  
-  if (results.usdc !== undefined) {
-    console.log(`TakaraLend USDC: ${results.usdc !== null ? results.usdc + '%' : '❌ 查詢失敗'}`);
-  }
+  console.log('📊 查詢結果摘要 (APR 高至低):\n');
 
-  if (results.vault_1 !== undefined) {
-    console.log(`Volos Vault #1:  ${results.vault_1 !== null ? results.vault_1 + '%' : '❌ 查詢失敗'}`);
-  }
-
-  if (results.vault_2 !== undefined) {
-    console.log(`Volos Vault #2:  ${results.vault_2 !== null ? results.vault_2 + '%' : '❌ 查詢失敗'}`);
-  }
+  summaryList.forEach((item, index) => {
+    let prefix = '   ';
+    if (index === 0 && item.apr !== null) {
+      prefix = '🏆 ';
+    }
+    
+    const nameStr = item.name.padEnd(16);
+    const aprStr = item.apr !== null ? `${item.apr}%` : '❌ 查詢失敗';
+    
+    console.log(`${prefix}${nameStr}: ${aprStr}`);
+  });
   
   console.log('\n' + '═'.repeat(60));
 }
