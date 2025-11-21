@@ -56,18 +56,20 @@ async function queryMMT() {
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const allPercentages = await page.evaluate(() => {
+    const apr = await page.evaluate(() => {
       const pageText = document.body.innerText;
-      const matches = pageText.match(/([0-9.]+)%/g) || [];
-      return [...new Set(matches)];
+      // 尋找 "Estimated APR:" 後面的百分比數值
+      // 匹配模式: Estimated APR: [換行或空白] 數值%
+      const match = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
+      
+      if (match && match[1]) {
+        return parseFloat(match[1]);
+      }
+      return null;
     });
 
-    const apyValues = allPercentages
-      .map(s => parseFloat(s))
-      .filter(p => p > 30 && p < 45);
-
-    if (apyValues.length > 0) {
-      return apyValues[0];
+    if (apr !== null) {
+      return apr;
     }
 
     return null;
