@@ -409,9 +409,13 @@ class Dashboard {
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const padding = { left: 40, right: 20 };
-        const chartWidth = this.canvas.width - padding.left - padding.right;
+        
+        // 使用邏輯像素寬度，而非物理像素寬度
+        const container = this.canvas.parentElement;
+        const logicalWidth = container.clientWidth;
+        const chartWidth = logicalWidth - padding.left - padding.right;
 
-        if (x < padding.left || x > this.canvas.width - padding.right) return;
+        if (x < padding.left || x > logicalWidth - padding.right) return;
 
         const ratio = (x - padding.left) / chartWidth;
         const index = Math.round(ratio * (this.filteredHistory.length - 1));
