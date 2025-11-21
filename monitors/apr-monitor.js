@@ -216,7 +216,7 @@ async function main() {
   const args = process.argv.slice(2);
   
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║              DeFi APR 統一查詢工具                       ║');
+  console.log('║              DeFi APR 統一查詢工具                        ║');
   console.log('╚═══════════════════════════════════════════════════════════╝\n');
 
   const results = {};

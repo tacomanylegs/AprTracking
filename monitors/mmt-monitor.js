@@ -14,7 +14,7 @@ const historyManager = require('../history-manager');
 const CONFIG = {
   poolId: '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
   webUrl: 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-  targetAPR: 37.66,
+  targetAPR: 23.26,
   updateInterval: 5 * 60 * 1000, // 5 分鐘
   timeout: 30000
 };
@@ -47,19 +47,20 @@ async function scrapeEstimatedAPR() {
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const allPercentages = await page.evaluate(() => {
+    const apr = await page.evaluate(() => {
       const pageText = document.body.innerText;
-      const matches = pageText.match(/([0-9.]+)%/g) || [];
-      return [...new Set(matches)];
+      // 尋找 "Estimated APR:" 後面的百分比數值
+      // 匹配模式: Estimated APR: [換行或空白] 數值%
+      const match = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
+      
+      if (match && match[1]) {
+        return parseFloat(match[1]);
+      }
+      return null;
     });
 
-    const apyValues = allPercentages
-      .map(s => parseFloat(s))
-      .filter(p => p > 30 && p < 45)
-      .sort((a, b) => Math.abs(a - CONFIG.targetAPR) - Math.abs(b - CONFIG.targetAPR));
-
-    if (apyValues.length > 0) {
-      return apyValues[0];
+    if (apr !== null) {
+      return apr;
     }
 
     return null;
