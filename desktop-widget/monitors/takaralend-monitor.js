@@ -66,9 +66,21 @@ async function scrapeMarket(market, browser) {
     const aprData = await page.evaluate(() => {
       const pageText = document.body.innerText;
       
-      // 提取 Supply APR
-      const supplyMatch = pageText.match(/Supply info[\s\S]*?APR[\s\n]*([0-9.]+)%/i) ||
-                         pageText.match(/Total[\s\S]*?Supply[\s\S]*?APR[\s\n]*([0-9.]+)%/i);
+      // 多種匹配模式
+      const patterns = [
+        /Supply[\s\S]*?APR[\s\n]*([0-9.]+)%/i,
+        /Supply\s+APR[:\s]+([0-9.]+)%/i,
+        /APR[\s\n]*([0-9.]+)%[\s\S]*?Supply/i
+      ];
+      
+      let supplyMatch = null;
+      for (const pattern of patterns) {
+        const match = pageText.match(pattern);
+        if (match) {
+          supplyMatch = match;
+          break;
+        }
+      }
       
       return {
         timestamp: new Date().toISOString(),

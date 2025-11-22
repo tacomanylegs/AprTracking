@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2025-11-22T15:27:50.102Z",
+    "supplyAPR": "11.68",
+    "success": true,
+    "debugText": "New\nNew\nGrab a share of 💰$1M rewards in our\nUSDT\nUSD₮0\nConnect\nOracle Type\nOracle price\n$0.99\nUtilization rate\n75.22%\nAmount to borrow\n​\n$\n​\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n​\n.\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n​\nK\nSupply info\nTotal Lending Supply\n9.96M USDT\n$9.95M\n19.93%\nAPR\n11.68%\nSupply caps\n50.00M\nSupply base APR\nLast 7 days\n2025-11-16\n2025-11-17\n2025-11-18\n2025-11-19\n2025-11-20\n2025-11-21\n2025-11-22\n0%\n25%\n50%\n75%\n100%\n7d\nCollateral Usage\nMax LTV\n75.00%\nLiquidation Threshold\n75.00%\nLiquidation P"
+  },
+  {
+    "timestamp": "2025-11-22T15:31:37.973Z",
+    "supplyAPR": "11.68",
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-22T15:36:06.041Z",
+    "supplyAPR": "11.67",
+    "success": true
+  }
+]

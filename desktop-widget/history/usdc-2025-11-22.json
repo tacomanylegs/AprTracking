@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2025-11-22T15:27:49.997Z",
+    "supplyAPR": "14.31",
+    "success": true,
+    "debugText": "New\nNew\nGrab a share of 💰$1M rewards in our\nUSDC\nUSDC\nConnect\nOracle Type\nOracle price\n$0.99\nUtilization rate\n53.98%\nAmount to borrow\n​\n$\n​\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n​\n.\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n​\nM\nSupply info\nTotal Lending Supply\n2.45M USDC\n$2.45M\n12.26%\nAPR\n14.31%\nSupply caps\n20.00M\nSupply base APR\nLast 7 days\n2025-11-16\n2025-11-17\n2025-11-18\n2025-11-19\n2025-11-20\n2025-11-21\n2025-11-22\n0%\n2%\n4%\n6%\n8%\n7d\nCollateral Usage\nMax LTV\n75.00%\nLiquidation Threshold\n75.00%\nLiquidation Penalty"
+  },
+  {
+    "timestamp": "2025-11-22T15:31:37.881Z",
+    "supplyAPR": "14.32",
+    "success": true
+  },
+  {
+    "timestamp": "2025-11-22T15:36:05.666Z",
+    "supplyAPR": "14.30",
+    "success": true
+  }
+]

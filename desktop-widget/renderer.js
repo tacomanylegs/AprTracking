@@ -4,6 +4,7 @@ const Chart = require('chart.js/auto');
 // State
 let chart = null;
 let currentHistory = [];
+let chartTimeRange = '1d'; // Default to 1 day
 
 // DOM Elements
 const mainView = document.getElementById('main-view');
@@ -31,11 +32,13 @@ document.getElementById('backBtn').addEventListener('click', () => {
 function showMainView() {
     mainView.style.display = 'flex';
     historyView.style.display = 'none';
+    ipcRenderer.send('restore-window');
 }
 
 function showHistoryView() {
     mainView.style.display = 'none';
     historyView.style.display = 'block';
+    ipcRenderer.send('maximize-window');
     renderHistoryView();
 }
 
@@ -127,6 +130,7 @@ function renderHistoryView() {
     if (!currentHistory || currentHistory.length === 0) return;
 
     renderStatsCards();
+    setupChartTimeFilter();
     renderChart();
     renderTable();
 }
@@ -157,16 +161,73 @@ function renderStatsCards() {
   `;
 }
 
+function setupChartTimeFilter() {
+    const chartContainer = document.getElementById('aprChart').parentElement;
+    let filterContainer = chartContainer.querySelector('.chart-time-filter');
+    
+    if (!filterContainer) {
+        filterContainer = document.createElement('div');
+        filterContainer.className = 'chart-time-filter';
+        filterContainer.style.cssText = 'position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 8px;';
+        chartContainer.style.position = 'relative';
+        chartContainer.appendChild(filterContainer);
+    }
+    
+    filterContainer.innerHTML = `
+        <button class="time-tab" data-value="12h" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">12小時</button>
+        <button class="time-tab" data-value="1d" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">1日</button>
+        <button class="time-tab" data-value="1m" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">1月</button>
+    `;
+    
+    const buttons = filterContainer.querySelectorAll('.time-tab');
+    buttons.forEach(btn => {
+        if (btn.dataset.value === chartTimeRange) {
+            btn.style.background = '#3b82f6';
+            btn.style.color = 'white';
+            btn.style.borderColor = '#3b82f6';
+        }
+        
+        btn.addEventListener('click', () => {
+            chartTimeRange = btn.dataset.value;
+            
+            // Update button styles
+            buttons.forEach(b => {
+                b.style.background = 'white';
+                b.style.color = '#333';
+                b.style.borderColor = 'rgba(0,0,0,0.1)';
+            });
+            btn.style.background = '#3b82f6';
+            btn.style.color = 'white';
+            btn.style.borderColor = '#3b82f6';
+            
+            renderChart();
+        });
+    });
+}
+
 function renderChart() {
     const ctx = document.getElementById('aprChart').getContext('2d');
 
-    // Limit to last 24 hours (approx 288 points at 5min interval)
-    // Or just last 50 points for clarity
-    const chartData = currentHistory.slice(-50);
+    // Filter data based on selected time range
+    const now = new Date().getTime();
+    let timeRangeMs = 24 * 60 * 60 * 1000; // Default to 1 day
+    
+    if (chartTimeRange === '12h') {
+        timeRangeMs = 12 * 60 * 60 * 1000;
+    } else if (chartTimeRange === '1m') {
+        timeRangeMs = 30 * 24 * 60 * 60 * 1000; // 1 month (30 days)
+    }
+    
+    const cutoffTime = now - timeRangeMs;
+    const chartData = currentHistory.filter(entry => new Date(entry.timestamp).getTime() >= cutoffTime);
 
     const labels = chartData.map(d => {
         const date = new Date(d.timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${month}-${day} ${hours}:${minutes}`;
     });
 
     // Extract datasets
@@ -192,7 +253,8 @@ function renderChart() {
             backgroundColor: color,
             tension: 0.4,
             borderWidth: 2,
-            pointRadius: 0
+            pointRadius: 0,
+            spanGaps: true
         };
     });
 
@@ -217,13 +279,42 @@ function renderChart() {
                     grid: { color: 'rgba(0,0,0,0.05)' }
                 },
                 x: {
-                    grid: { display: false }
+                    grid: { display: false },
+                    reverse: true,
+                    ticks: {
+                        maxRotation: 0,
+                        maxTicksLimit: 6,
+                        font: { size: 11 },
+                        callback: function(value, index, ticks) {
+                            const label = this.getLabelForValue(value);
+                            // Hide first label (rightmost, might be truncated)
+                            if (index === 0) return '';
+                            return label;
+                        }
+                    }
                 }
             },
             plugins: {
                 legend: {
                     position: 'top',
                     labels: { usePointStyle: true }
+                },
+                tooltip: {
+                    padding: 16,
+                    titleMarginBottom: 12,
+                    bodySpacing: 10,
+                    itemSort: function(a, b) {
+                        // Sort by value descending (highest APR first)
+                        const valA = a.raw !== null ? a.raw : -Infinity;
+                        const valB = b.raw !== null ? b.raw : -Infinity;
+                        return valB - valA;
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.raw !== null ? context.raw.toFixed(2) + '%' : 'N/A';
+                            return context.dataset.label + ': ' + value;
+                        }
+                    }
                 }
             }
         }
@@ -267,15 +358,15 @@ function updateFilterOptions() {
 }
 
 function renderTable() {
-    // Show last 20 entries (filtered)
+    // Show last 100 entries (filtered)
     const filterValue = historyFilter.value;
-    const tableData = [...currentHistory].reverse().slice(0, 50); // Get more to filter
+    const tableData = [...currentHistory].reverse().slice(0, 200); // Get more to filter
 
     historyTableBody.innerHTML = '';
 
     let count = 0;
     for (const entry of tableData) {
-        if (count >= 20) break;
+        if (count >= 100) break;
 
         const date = new Date(entry.timestamp).toLocaleString();
 
@@ -292,9 +383,6 @@ function renderTable() {
             historyTableBody.appendChild(tr);
         });
 
-        // Only increment count if we actually showed something? 
-        // Or is the limit on timestamps? Let's limit on rows shown.
-        // Actually, simpler to just show last 20 timestamps' worth of data matching filter.
         count++;
     }
 }

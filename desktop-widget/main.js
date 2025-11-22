@@ -12,7 +12,7 @@ let mainWindow = null;
 let updateInterval = null;
 
 // Configuration
-const UPDATE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const UPDATE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const HISTORY_FILE = path.join(__dirname, 'history', 'apr-history.json');
 
 // Ensure history directory exists
@@ -22,8 +22,8 @@ if (!fs.existsSync(path.dirname(HISTORY_FILE))) {
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 400,
-        height: 400,
+        width: 350,
+        height: 370,
         show: false, // Don't show until requested
         autoHideMenuBar: true, // Hide the menu bar
         webPreferences: {
@@ -90,6 +90,19 @@ ipcMain.on('icon-generated', (event, dataUrl) => {
 
 ipcMain.on('refresh-request', () => {
     fetchAndDisplayData();
+});
+
+ipcMain.on('maximize-window', (event) => {
+    if (mainWindow) {
+        mainWindow.maximize();
+    }
+});
+
+ipcMain.on('restore-window', (event) => {
+    if (mainWindow) {
+        mainWindow.unmaximize();
+        mainWindow.setSize(350, 370, true);
+    }
 });
 
 async function fetchAndDisplayData() {
