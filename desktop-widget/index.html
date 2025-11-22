@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>DeFi APR Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Main View (Popup Style) -->
+    <div id="main-view" class="container">
+        <h2>DeFi APR Tracker</h2>
+        <div class="actions">
+            <button id="scanBtn">🔄 立即刷新</button>
+            <button id="dashboardBtn" class="secondary-btn">📊 查看歷史走勢</button>
+        </div>
+
+        <div id="results" class="results-list">
+            <div class="placeholder">載入中...</div>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <!-- History View (Dashboard Style) -->
+    <div id="history-view">
+        <div class="app-container">
+            <div class="history-header">
+                <h1>收益率分析</h1>
+                <button id="backBtn" class="back-btn button">← 返回</button>
+            </div>
+
+            <div class="stats-grid" id="statsGrid">
+                <!-- Stats cards -->
+            </div>
+
+            <div class="chart-container glass-panel">
+                <div class="chart-header">
+                    <h2>年化收益率走勢</h2>
+                </div>
+                <canvas id="aprChart"></canvas>
+            </div>
+
+            <div class="history-table-container glass-panel">
+                <div class="section-header">
+                    <h2>歷史紀錄</h2>
+                </div>
+                <div class="table-wrapper">
+                    <table id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>協議</th>
+                                <th>年化收益率</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas for generating tray icon -->
+    <canvas id="iconCanvas" width="32" height="32"></canvas>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
