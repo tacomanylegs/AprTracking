@@ -1,7 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const AutoLaunch = require('auto-launch');
 
 // Import monitors
 const mmtMonitor = require('./monitors/mmt-monitor');
@@ -21,16 +20,10 @@ if (!fs.existsSync(path.dirname(HISTORY_FILE))) {
     fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
 }
 
-// Auto-launch configuration
-const aprWidgetAutoLauncher = new AutoLaunch({
-    name: 'DeFi APR Widget',
-    path: app.getPath('exe'),
-});
-
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 400,
+        height: 400,
         show: false, // Don't show until requested
         autoHideMenuBar: true, // Hide the menu bar
         webPreferences: {
@@ -188,9 +181,6 @@ app.whenReady().then(() => {
 
     // Schedule updates
     updateInterval = setInterval(fetchAndDisplayData, UPDATE_INTERVAL_MS);
-
-    // Enable auto-launch
-    aprWidgetAutoLauncher.enable().catch(err => console.error('AutoLaunch error:', err));
 });
 
 app.on('window-all-closed', () => {

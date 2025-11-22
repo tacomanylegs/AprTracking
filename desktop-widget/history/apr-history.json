@@ -58,5 +58,125 @@
         "url": "https://www.volosui.com/vaults"
       }
     ]
+  },
+  {
+    "timestamp": "2025-11-22T08:34:29.222Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.65,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.54,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.16,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-22T08:35:33.574Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.63,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.52,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.16,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-22T08:36:26.576Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.65,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.54,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.16,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-22T08:41:26.553Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.63,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.52,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.17,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-22T08:46:05.677Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.63,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.52,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.15,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-22T08:46:25.735Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.63,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 14.52,
+        "url": "https://app.takaralend.com/market/USDC"
+      },
+      {
+        "name": "Volos V2",
+        "apr": 17.15,
+        "url": "https://www.volosui.com/vaults"
+      }
+    ]
   }
 ]
