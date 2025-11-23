@@ -41,6 +41,22 @@ function createWindow() {
         }
         return false;
     });
+
+    // Handle user manually restoring/unmaximizing the window
+    mainWindow.on('unmaximize', () => {
+        mainWindow.setSize(350, 370, true);
+        mainWindow.webContents.send('window-restored');
+    });
+
+    // Handle user manually maximizing the window
+    mainWindow.on('maximize', () => {
+        mainWindow.webContents.send('window-maximized');
+    });
+
+    // Set initial loading icon
+    mainWindow.webContents.on('did-finish-load', () => {
+        updateTrayIcon('?');
+    });
 }
 
 function createTray() {
@@ -118,9 +134,9 @@ async function fetchAndDisplayData() {
         ]);
 
         const results = [
-            { name: 'Takara USDT', apr: takaraUsdt, url: 'https://app.takaralend.com/market/USD%E2%82%AE0' },
-            { name: 'Takara USDC', apr: takaraUsdc, url: 'https://app.takaralend.com/market/USDC' },
-            { name: 'Volos V2', apr: volos.vault_2, url: 'https://www.volosui.com/vaults' }
+            { name: 'Takara USDT', apr: takaraUsdt ?? null, url: 'https://app.takaralend.com/market/USD%E2%82%AE0' },
+            { name: 'Takara USDC', apr: takaraUsdc ?? null, url: 'https://app.takaralend.com/market/USDC' },
+            { name: 'Volos V2', apr: volos?.vault_2 ?? null, url: 'https://www.volosui.com/vaults' }
         ];
 
         // Filter nulls and find max

@@ -25,20 +25,34 @@ document.getElementById('dashboardBtn').addEventListener('click', () => {
 });
 
 document.getElementById('backBtn').addEventListener('click', () => {
+    ipcRenderer.send('restore-window');
     showMainView();
+});
+
+// Listen for window restoration (from user action or back button)
+ipcRenderer.on('window-restored', () => {
+    showMainView();
+});
+
+// Listen for window maximization
+ipcRenderer.on('window-maximized', () => {
+    switchToHistoryUI();
 });
 
 // --- View Switching ---
 function showMainView() {
     mainView.style.display = 'flex';
     historyView.style.display = 'none';
-    ipcRenderer.send('restore-window');
 }
 
 function showHistoryView() {
+    switchToHistoryUI();
+    ipcRenderer.send('maximize-window');
+}
+
+function switchToHistoryUI() {
     mainView.style.display = 'none';
     historyView.style.display = 'block';
-    ipcRenderer.send('maximize-window');
     renderHistoryView();
 }
 
@@ -144,6 +158,21 @@ function renderStatsCards() {
     // Find Max APR
     const maxItem = data.reduce((prev, current) => (prev.apr > current.apr) ? prev : current);
 
+    // Calculate Average APR for this protocol
+    let totalApr = 0;
+    let count = 0;
+    currentHistory.forEach(entry => {
+        const item = entry.data.find(d => d.name === maxItem.name);
+        if (item && item.apr != null) {
+            const val = Number(item.apr);
+            if (!isNaN(val)) {
+                totalApr += val;
+                count++;
+            }
+        }
+    });
+    const avgApr = count > 0 ? (totalApr / count).toFixed(2) : 'N/A';
+
     const url = maxItem.url || '#';
     const clickHandler = `onclick="openExternal('${url}');"`;
 
@@ -151,7 +180,10 @@ function renderStatsCards() {
     <div class="stat-card" ${clickHandler}>
       <div class="stat-title">當前最高收益率</div>
       <div class="stat-value" style="color: #e91e63;">${maxItem.apr.toFixed(2)}%</div>
-      <div class="stat-trend">${maxItem.name}</div>
+      <div class="stat-trend">
+        ${maxItem.name}
+        <span style="font-size: 12px; color: #3b82f6; display: block; margin-top: 2px;">平均: ${avgApr}%</span>
+      </div>
     </div>
     <div class="stat-card" ${clickHandler}>
       <div class="stat-title">優勢協議</div>
@@ -164,7 +196,7 @@ function renderStatsCards() {
 function setupChartTimeFilter() {
     const chartContainer = document.getElementById('aprChart').parentElement;
     let filterContainer = chartContainer.querySelector('.chart-time-filter');
-    
+
     if (!filterContainer) {
         filterContainer = document.createElement('div');
         filterContainer.className = 'chart-time-filter';
@@ -172,13 +204,13 @@ function setupChartTimeFilter() {
         chartContainer.style.position = 'relative';
         chartContainer.appendChild(filterContainer);
     }
-    
+
     filterContainer.innerHTML = `
         <button class="time-tab" data-value="12h" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">12小時</button>
         <button class="time-tab" data-value="1d" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">1日</button>
         <button class="time-tab" data-value="1m" style="padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); background: white; color: #333; cursor: pointer; font-size: 13px; transition: all 0.2s;">1月</button>
     `;
-    
+
     const buttons = filterContainer.querySelectorAll('.time-tab');
     buttons.forEach(btn => {
         if (btn.dataset.value === chartTimeRange) {
@@ -186,10 +218,10 @@ function setupChartTimeFilter() {
             btn.style.color = 'white';
             btn.style.borderColor = '#3b82f6';
         }
-        
+
         btn.addEventListener('click', () => {
             chartTimeRange = btn.dataset.value;
-            
+
             // Update button styles
             buttons.forEach(b => {
                 b.style.background = 'white';
@@ -199,7 +231,7 @@ function setupChartTimeFilter() {
             btn.style.background = '#3b82f6';
             btn.style.color = 'white';
             btn.style.borderColor = '#3b82f6';
-            
+
             renderChart();
         });
     });
@@ -211,13 +243,13 @@ function renderChart() {
     // Filter data based on selected time range
     const now = new Date().getTime();
     let timeRangeMs = 24 * 60 * 60 * 1000; // Default to 1 day
-    
+
     if (chartTimeRange === '12h') {
         timeRangeMs = 12 * 60 * 60 * 1000;
     } else if (chartTimeRange === '1m') {
         timeRangeMs = 30 * 24 * 60 * 60 * 1000; // 1 month (30 days)
     }
-    
+
     const cutoffTime = now - timeRangeMs;
     const chartData = currentHistory.filter(entry => new Date(entry.timestamp).getTime() >= cutoffTime);
 
@@ -283,13 +315,29 @@ function renderChart() {
                     reverse: true,
                     ticks: {
                         maxRotation: 0,
-                        maxTicksLimit: 6,
+                        autoSkip: false,
                         font: { size: 11 },
-                        callback: function(value, index, ticks) {
-                            const label = this.getLabelForValue(value);
-                            // Hide first label (rightmost, might be truncated)
-                            if (index === 0) return '';
-                            return label;
+                        callback: function (value, index, ticks) {
+                            const total = this.chart.data.labels.length;
+
+                            // Always show the last label (Leftmost in reverse mode)
+                            if (value === total - 1) {
+                                return this.getLabelForValue(value);
+                            }
+
+                            // Hide the first label (Rightmost)
+                            if (value === 0) return '';
+
+                            // Calculate step to show roughly 6 labels
+                            // Anchor from the newest (leftmost) side
+                            const step = Math.ceil(total / 6);
+                            const distanceFromNewest = (total - 1) - value;
+
+                            if (distanceFromNewest % step === 0) {
+                                return this.getLabelForValue(value);
+                            }
+
+                            return '';
                         }
                     }
                 }
@@ -303,14 +351,14 @@ function renderChart() {
                     padding: 16,
                     titleMarginBottom: 12,
                     bodySpacing: 10,
-                    itemSort: function(a, b) {
+                    itemSort: function (a, b) {
                         // Sort by value descending (highest APR first)
                         const valA = a.raw !== null ? a.raw : -Infinity;
                         const valB = b.raw !== null ? b.raw : -Infinity;
                         return valB - valA;
                     },
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             const value = context.raw !== null ? context.raw.toFixed(2) + '%' : 'N/A';
                             return context.dataset.label + ': ' + value;
                         }
@@ -324,19 +372,26 @@ function renderChart() {
 // --- Filter Logic ---
 const historyFilter = document.createElement('select');
 historyFilter.id = 'historyFilter';
-historyFilter.innerHTML = '<option value="all">所有協議</option>';
+// No default 'all' option
 historyFilter.style.cssText = 'padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); margin-left: auto;';
 historyFilter.addEventListener('change', () => {
     renderTable();
 });
 
+const avgAprDisplay = document.createElement('div');
+avgAprDisplay.style.cssText = 'margin-left: 15px; padding: 4px 12px; background: #e3f2fd; color: #1976d2; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; display: none; align-items: center; transition: background 0.2s;';
+avgAprDisplay.onmouseover = () => avgAprDisplay.style.background = '#bbdefb';
+avgAprDisplay.onmouseout = () => avgAprDisplay.style.background = '#e3f2fd';
+
 // Insert filter into header
 const sectionHeader = document.querySelector('.history-table-container .section-header');
+sectionHeader.appendChild(avgAprDisplay);
 sectionHeader.appendChild(historyFilter);
 
 function updateFilterOptions() {
     if (!currentHistory || currentHistory.length === 0) return;
 
+    // Get all protocols
     const protocols = new Set();
     currentHistory.forEach(entry => {
         entry.data.forEach(item => {
@@ -344,22 +399,82 @@ function updateFilterOptions() {
         });
     });
 
-    const currentVal = historyFilter.value;
-    historyFilter.innerHTML = '<option value="all">所有協議</option>';
+    // Get latest APRs for sorting
+    const latestEntry = currentHistory[currentHistory.length - 1];
+    const latestAprs = {};
+    if (latestEntry && latestEntry.data) {
+        latestEntry.data.forEach(item => {
+            latestAprs[item.name] = item.apr !== null ? item.apr : -1;
+        });
+    }
 
-    Array.from(protocols).sort().forEach(name => {
+    const currentVal = historyFilter.value;
+    historyFilter.innerHTML = '';
+
+    // Sort by APR desc
+    const sortedProtocols = Array.from(protocols).sort((a, b) => {
+        const aprA = latestAprs[a] !== undefined ? latestAprs[a] : -1;
+        const aprB = latestAprs[b] !== undefined ? latestAprs[b] : -1;
+        return aprB - aprA;
+    });
+
+    sortedProtocols.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
         option.textContent = name;
         historyFilter.appendChild(option);
     });
 
-    historyFilter.value = currentVal;
+    // Default to first (highest APR) if current is 'all' or invalid
+    if (currentVal === 'all' || !protocols.has(currentVal)) {
+        if (sortedProtocols.length > 0) {
+            historyFilter.value = sortedProtocols[0];
+        }
+    } else {
+        historyFilter.value = currentVal;
+    }
 }
 
 function renderTable() {
     // Show last 100 entries (filtered)
     const filterValue = historyFilter.value;
+
+    // If no filter value (e.g. no data yet), do nothing
+    if (!filterValue || filterValue === 'all') {
+        avgAprDisplay.style.display = 'none';
+        return;
+    }
+
+    // Calculate Average APR
+    let totalApr = 0;
+    let aprCount = 0;
+    let protocolUrl = '';
+
+    currentHistory.forEach(entry => {
+        entry.data.forEach(item => {
+            // Check name match and ensure apr is valid
+            if (item.name === filterValue && item.apr != null) {
+                const val = Number(item.apr);
+                if (!isNaN(val)) {
+                    totalApr += val;
+                    aprCount++;
+                    if (item.url) protocolUrl = item.url;
+                }
+            }
+        });
+    });
+
+    if (aprCount > 0) {
+        avgAprDisplay.innerHTML = `平均收益: ${(totalApr / aprCount).toFixed(2)}% <span style="font-size: 10px; margin-left: 4px;">↗</span>`;
+        avgAprDisplay.style.display = 'inline-flex';
+        avgAprDisplay.onclick = () => {
+            if (protocolUrl) window.openExternal(protocolUrl);
+        };
+        avgAprDisplay.title = `前往 ${filterValue}`;
+    } else {
+        avgAprDisplay.style.display = 'none';
+    }
+
     const tableData = [...currentHistory].reverse().slice(0, 200); // Get more to filter
 
     historyTableBody.innerHTML = '';
@@ -372,7 +487,7 @@ function renderTable() {
 
         entry.data.forEach(item => {
             if (item.apr === null) return;
-            if (filterValue !== 'all' && item.name !== filterValue) return;
+            if (item.name !== filterValue) return;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
