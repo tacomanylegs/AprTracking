@@ -286,6 +286,7 @@ function renderChart() {
             tension: 0.4,
             borderWidth: 2,
             pointRadius: 0,
+            pointHoverRadius: 4,
             spanGaps: true
         };
     });
@@ -308,7 +309,13 @@ function renderChart() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.05)' }
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: {
+                        font: {
+                            family: "'Segoe UI', sans-serif",
+                            size: 12
+                        }
+                    }
                 },
                 x: {
                     grid: { display: false },
@@ -316,7 +323,10 @@ function renderChart() {
                     ticks: {
                         maxRotation: 0,
                         autoSkip: false,
-                        font: { size: 11 },
+                        font: {
+                            family: "'Segoe UI', sans-serif",
+                            size: 12
+                        },
                         callback: function (value, index, ticks) {
                             const total = this.chart.data.labels.length;
 
@@ -345,7 +355,18 @@ function renderChart() {
             plugins: {
                 legend: {
                     position: 'top',
-                    labels: { usePointStyle: true }
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        boxWidth: 6,
+                        boxHeight: 6,
+                        padding: 12,
+                        font: {
+                            family: "'Segoe UI', sans-serif",
+                            size: 14,
+                            weight: 500
+                        }
+                    }
                 },
                 tooltip: {
                     padding: 16,
