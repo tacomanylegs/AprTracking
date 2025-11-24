@@ -136,6 +136,7 @@ async function fetchAndDisplayData() {
         const results = [
             { name: 'Takara USDT', apr: takaraUsdt ?? null, url: 'https://app.takaralend.com/market/USD%E2%82%AE0' },
             { name: 'Takara USDC', apr: takaraUsdc ?? null, url: 'https://app.takaralend.com/market/USDC' },
+            { name: 'Volos V1', apr: volos?.vault_1 ?? null, url: 'https://www.volosui.com/vaults' },
             { name: 'Volos V2', apr: volos?.vault_2 ?? null, url: 'https://www.volosui.com/vaults' }
         ];
 
