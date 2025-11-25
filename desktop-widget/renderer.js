@@ -539,5 +539,12 @@ ipcRenderer.invoke('get-history').then(history => {
     currentHistory = history;
     updateFilterOptions();
     renderMainView();
+    
+    // Update status with last entry time
+    if (history && history.length > 0) {
+        const lastEntry = history[history.length - 1];
+        const lastTime = new Date(lastEntry.timestamp);
+        statusDiv.textContent = '最後更新: ' + lastTime.toLocaleTimeString();
+    }
 });
 
