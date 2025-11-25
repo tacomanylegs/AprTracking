@@ -85,7 +85,7 @@ ipcRenderer.on('generate-icon', (event, text) => {
 // --- Data Handling ---
 ipcRenderer.on('data-updated', (event, history) => {
     currentHistory = history;
-    statusDiv.textContent = '最後更新: ' + new Date().toLocaleTimeString();
+    updateStatusWithLink();
 
     renderMainView();
     if (historyView.style.display === 'block') {
@@ -138,6 +138,13 @@ function renderMainView() {
 window.openExternal = (url) => {
     shell.openExternal(url);
 };
+
+// Function to update status with hyperlink
+function updateStatusWithLink() {
+    const time = new Date().toLocaleTimeString();
+    const url = 'https://docs.google.com/spreadsheets/d/1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0/edit?gid=0#gid=0';
+    statusDiv.innerHTML = `最後更新: <a href="#" style="color: inherit; text-decoration: none; cursor: pointer;" onclick="openExternal('${url}'); return false;">${time}</a>`;
+}
 
 // --- Render History View ---
 function renderHistoryView() {
@@ -526,7 +533,7 @@ function renderTable() {
 // Update filter options when data loads
 ipcRenderer.on('data-updated', (event, history) => {
     currentHistory = history;
-    statusDiv.textContent = '最後更新: ' + new Date().toLocaleTimeString();
+    updateStatusWithLink();
     updateFilterOptions();
     renderMainView();
     if (historyView.style.display === 'block') {
@@ -544,7 +551,8 @@ ipcRenderer.invoke('get-history').then(history => {
     if (history && history.length > 0) {
         const lastEntry = history[history.length - 1];
         const lastTime = new Date(lastEntry.timestamp);
-        statusDiv.textContent = '最後更新: ' + lastTime.toLocaleTimeString();
+        const url = 'https://docs.google.com/spreadsheets/d/1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0/edit?gid=0#gid=0';
+        statusDiv.innerHTML = `最後更新: <a href="#" style="color: inherit; text-decoration: none; cursor: pointer;" onclick="openExternal('${url}'); return false;">${lastTime.toLocaleTimeString()}</a>`;
     }
 });
 
