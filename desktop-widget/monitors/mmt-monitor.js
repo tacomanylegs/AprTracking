@@ -196,5 +196,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  scrapeEstimatedAPR
+  scrapeEstimatedAPR,
+  getAPR: scrapeEstimatedAPR
 };
