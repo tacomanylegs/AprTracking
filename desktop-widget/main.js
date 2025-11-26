@@ -146,9 +146,10 @@ async function fetchAndDisplayData() {
     // ]);
 
     // Parallel fetch
-    const [takaraUsdt, takaraUsdc, ] = await Promise.all([
+    const [takaraUsdt, takaraUsdc, mmt] = await Promise.all([
       takaralendMonitor.getAPR("USDT").catch((e) => null),
-      takaralendMonitor.getAPR("USDC").catch((e) => null)
+      takaralendMonitor.getAPR("USDC").catch((e) => null),
+      mmtMonitor.getAPR().catch((e) => null)
     ]);
 
     const results = [
@@ -161,6 +162,11 @@ async function fetchAndDisplayData() {
         name: "Takara USDC",
         apr: takaraUsdc ?? null,
         url: "https://app.takaralend.com/market/USDC",
+      },
+      {
+        name: "MMT",
+        apr: mmt ?? null,
+        url: "https://app.mmt.com",
       },
       // {
       //   name: "Volos V1",
