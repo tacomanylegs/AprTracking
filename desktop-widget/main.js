@@ -136,13 +136,19 @@ async function fetchAndDisplayData() {
   if (tray) tray.setToolTip("Updating...");
 
   try {
+    // // Parallel fetch
+    // const [takaraUsdt, takaraUsdc, volos] = await Promise.all([
+    //   takaralendMonitor.getAPR("USDT").catch((e) => null),
+    //   takaralendMonitor.getAPR("USDC").catch((e) => null),
+    //   volosMonitor
+    //     .queryVaults()
+    //     .catch((e) => ({ vault_1: null, vault_2: null })),
+    // ]);
+
     // Parallel fetch
-    const [takaraUsdt, takaraUsdc, volos] = await Promise.all([
+    const [takaraUsdt, takaraUsdc, ] = await Promise.all([
       takaralendMonitor.getAPR("USDT").catch((e) => null),
-      takaralendMonitor.getAPR("USDC").catch((e) => null),
-      volosMonitor
-        .queryVaults()
-        .catch((e) => ({ vault_1: null, vault_2: null })),
+      takaralendMonitor.getAPR("USDC").catch((e) => null)
     ]);
 
     const results = [
@@ -156,16 +162,16 @@ async function fetchAndDisplayData() {
         apr: takaraUsdc ?? null,
         url: "https://app.takaralend.com/market/USDC",
       },
-      {
-        name: "Volos V1",
-        apr: volos?.vault_1 ?? null,
-        url: "https://www.volosui.com/vaults",
-      },
-      {
-        name: "Volos V2",
-        apr: volos?.vault_2 ?? null,
-        url: "https://www.volosui.com/vaults",
-      },
+      // {
+      //   name: "Volos V1",
+      //   apr: volos?.vault_1 ?? null,
+      //   url: "https://www.volosui.com/vaults",
+      // },
+      // {
+      //   name: "Volos V2",
+      //   apr: volos?.vault_2 ?? null,
+      //   url: "https://www.volosui.com/vaults",
+      // },
     ];
 
     // Filter nulls and find max
