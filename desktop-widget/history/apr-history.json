@@ -13,5 +13,50 @@
         "url": "https://app.takaralend.com/market/USDC"
       }
     ]
+  },
+  {
+    "timestamp": "2025-11-26T15:06:09.311Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.16,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 9.95,
+        "url": "https://app.takaralend.com/market/USDC"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T15:36:08.541Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.18,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 9.97,
+        "url": "https://app.takaralend.com/market/USDC"
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T16:06:08.387Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.18,
+        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 9.93,
+        "url": "https://app.takaralend.com/market/USDC"
+      }
+    ]
   }
 ]
