@@ -156,27 +156,22 @@ async function fetchAndDisplayData() {
       {
         name: "Takara USDT",
         apr: takaraUsdt ?? null,
-        url: "https://app.takaralend.com/market/USD%E2%82%AE0",
       },
       {
         name: "Takara USDC",
         apr: takaraUsdc ?? null,
-        url: "https://app.takaralend.com/market/USDC",
       },
       {
         name: "MMT",
         apr: mmt ?? null,
-        url: "https://app.mmt.com",
       },
       // {
       //   name: "Volos V1",
       //   apr: volos?.vault_1 ?? null,
-      //   url: "https://www.volosui.com/vaults",
       // },
       // {
       //   name: "Volos V2",
       //   apr: volos?.vault_2 ?? null,
-      //   url: "https://www.volosui.com/vaults",
       // },
     ];
 
@@ -209,7 +204,9 @@ async function fetchAndDisplayData() {
 
 function saveHistory(data) {
   const now = new Date().toISOString();
-  const entry = { timestamp: now, data };
+  // Remove URL fields before saving
+  const cleanData = data.map(({ url, ...rest }) => rest);
+  const entry = { timestamp: now, data: cleanData };
 
   let history = [];
   if (fs.existsSync(HISTORY_FILE)) {

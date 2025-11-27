@@ -1,6 +1,15 @@
 const { ipcRenderer, shell } = require('electron');
 const Chart = require('chart.js/auto');
 
+// URL Mapping - 硬編碼的協議 URL
+const PROTOCOL_URLS = {
+  'Takara USDT': 'https://app.takaralend.com/market/USD%E2%82%AE0',
+  'Takara USDC': 'https://app.takaralend.com/market/USDC',
+  'MMT': 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
+  'Volos V1': 'https://www.volosui.com/vaults',
+  'Volos V2': 'https://www.volosui.com/vaults'
+};
+
 // State
 let chart = null;
 let currentHistory = [];
@@ -121,7 +130,8 @@ function renderMainView() {
         div.className = 'result-item';
         if (index === 0) div.classList.add('champion');
 
-        const linkHtml = item.url ? `<a href="#" class="link-icon" onclick="openExternal('${item.url}'); return false;">🔗</a>` : '';
+        const url = PROTOCOL_URLS[item.name];
+        const linkHtml = url ? `<a href="#" class="link-icon" onclick="openExternal('${url}'); return false;">🔗</a>` : '';
 
         div.innerHTML = `
       <div class="left-col">
@@ -180,7 +190,7 @@ function renderStatsCards() {
     });
     const avgApr = count > 0 ? (totalApr / count).toFixed(2) : 'N/A';
 
-    const url = maxItem.url || '#';
+    const url = PROTOCOL_URLS[maxItem.name] || '#';
     const clickHandler = `onclick="openExternal('${url}');"`;
 
     statsGrid.innerHTML = `
@@ -476,7 +486,6 @@ function renderTable() {
     // Calculate Average APR
     let totalApr = 0;
     let aprCount = 0;
-    let protocolUrl = '';
 
     currentHistory.forEach(entry => {
         entry.data.forEach(item => {
@@ -486,13 +495,13 @@ function renderTable() {
                 if (!isNaN(val)) {
                     totalApr += val;
                     aprCount++;
-                    if (item.url) protocolUrl = item.url;
                 }
             }
         });
     });
 
     if (aprCount > 0) {
+        const protocolUrl = PROTOCOL_URLS[filterValue];
         avgAprDisplay.innerHTML = `平均收益: ${(totalApr / aprCount).toFixed(2)}% <span style="font-size: 10px; margin-left: 4px;">↗</span>`;
         avgAprDisplay.style.display = 'inline-flex';
         avgAprDisplay.onclick = () => {

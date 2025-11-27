@@ -7,21 +7,6 @@ const SPREADSHEET_ID = '1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0';
 const SHEET_NAME = 'APR';
 const SERVICE_ACCOUNT_FILE = path.join(__dirname, 'service-account.json');
 
-// URL mapping for each protocol
-const URL_MAP = {
-    'Takara USDT': 'https://app.takaralend.com/market/USD%E2%82%AE0',
-    'Takara USDC': 'https://app.takaralend.com/market/USDC',
-    'Volos V1': 'https://www.volosui.com/vaults',
-    'Volos V2': 'https://www.volosui.com/vaults'
-};
-
-/**
- * Get URL for a protocol name
- */
-function getUrlForName(name) {
-    return URL_MAP[name] || null;
-}
-
 let authClient = null;
 
 /**
@@ -202,8 +187,7 @@ async function fetchAllHistory() {
 
             historyMap.get(timestamp).data.push({ 
                 name, 
-                apr,
-                url: getUrlForName(name)
+                apr
             });
         }
 

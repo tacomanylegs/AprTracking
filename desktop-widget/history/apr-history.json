@@ -1,21 +1,715 @@
 [
   {
-    "timestamp": "2025-11-26T17:30:36.000Z",
+    "timestamp": "2025-11-26T17:42:28.000Z",
     "data": [
       {
         "name": "Takara USDT",
-        "apr": 11.34,
-        "url": "https://app.takaralend.com/market/USD%E2%82%AE0"
+        "apr": 11.43
       },
       {
         "name": "Takara USDC",
-        "apr": 10.14,
-        "url": "https://app.takaralend.com/market/USDC"
+        "apr": 10.22
       },
       {
         "name": "MMT",
-        "apr": 19.95,
-        "url": null
+        "apr": 19.97
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T17:50:01.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.45
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.23
+      },
+      {
+        "name": "MMT",
+        "apr": 20.02
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T18:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.54
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.3
+      },
+      {
+        "name": "MMT",
+        "apr": 21.56
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T18:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.58
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.29
+      },
+      {
+        "name": "MMT",
+        "apr": 23.19
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T19:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.6
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.3
+      },
+      {
+        "name": "MMT",
+        "apr": 24.95
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T19:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.64
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.31
+      },
+      {
+        "name": "MMT",
+        "apr": 27.68
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T20:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.17
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.28
+      },
+      {
+        "name": "MMT",
+        "apr": 30.92
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T20:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.15
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.27
+      },
+      {
+        "name": "MMT",
+        "apr": 33.83
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T21:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.13
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.25
+      },
+      {
+        "name": "MMT",
+        "apr": 36.17
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T21:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.17
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.28
+      },
+      {
+        "name": "MMT",
+        "apr": 38.91
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T22:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.15
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.27
+      },
+      {
+        "name": "MMT",
+        "apr": 41.16
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T22:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.13
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.25
+      },
+      {
+        "name": "MMT",
+        "apr": 43.37
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T23:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.14
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.26
+      },
+      {
+        "name": "MMT",
+        "apr": 45.64
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-26T23:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.14
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.26
+      },
+      {
+        "name": "MMT",
+        "apr": 47.73
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T00:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.14
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.79
+      },
+      {
+        "name": "MMT",
+        "apr": 48.35
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T00:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.18
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.83
+      },
+      {
+        "name": "MMT",
+        "apr": 48.37
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T01:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.16
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.81
+      },
+      {
+        "name": "MMT",
+        "apr": 48.57
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T01:49:57.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 11.15
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.81
+      },
+      {
+        "name": "MMT",
+        "apr": 47.56
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T02:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 9.22
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.83
+      },
+      {
+        "name": "MMT",
+        "apr": 47.25
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T02:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 9.26
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.87
+      },
+      {
+        "name": "MMT",
+        "apr": 47.66
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T03:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 9.19
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.9
+      },
+      {
+        "name": "MMT",
+        "apr": 48.21
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T03:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.04
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.82
+      },
+      {
+        "name": "MMT",
+        "apr": 47.9
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T04:19:57.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.09
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.93
+      },
+      {
+        "name": "MMT",
+        "apr": 48.67
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T04:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.07
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.88
+      },
+      {
+        "name": "MMT",
+        "apr": 48.68
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T05:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.05
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 11.39
+      },
+      {
+        "name": "MMT",
+        "apr": 48.11
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T05:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.01
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 11.36
+      },
+      {
+        "name": "MMT",
+        "apr": 47.03
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T06:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.05
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 11.39
+      },
+      {
+        "name": "MMT",
+        "apr": 46.56
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T06:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.07
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 11.42
+      },
+      {
+        "name": "MMT",
+        "apr": 46.57
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T07:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.11
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.96
+      },
+      {
+        "name": "MMT",
+        "apr": 46.05
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T07:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.09
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.96
+      },
+      {
+        "name": "MMT",
+        "apr": 45.79
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T08:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.07
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.94
+      },
+      {
+        "name": "MMT",
+        "apr": 44.46
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T08:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.09
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.96
+      },
+      {
+        "name": "MMT",
+        "apr": 43.23
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T09:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.13
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.48
+      },
+      {
+        "name": "MMT",
+        "apr": 45.2
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T09:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.1
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.26
+      },
+      {
+        "name": "MMT",
+        "apr": 45.18
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T10:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 9.22
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.23
+      },
+      {
+        "name": "MMT",
+        "apr": 42.99
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T10:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 9.18
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.69
+      },
+      {
+        "name": "MMT",
+        "apr": null
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T10:53:21.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.43
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.69
+      },
+      {
+        "name": "MMT",
+        "apr": 40.62
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T11:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.4
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.19
+      },
+      {
+        "name": "MMT",
+        "apr": 39.27
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T11:49:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.42
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.23
+      },
+      {
+        "name": "MMT",
+        "apr": 38.13
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T12:19:56.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.33
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.18
+      },
+      {
+        "name": "MMT",
+        "apr": 36.85
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T12:49:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.31
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 10.17
+      },
+      {
+        "name": "MMT",
+        "apr": 35.5
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-11-27T13:19:55.000Z",
+    "data": [
+      {
+        "name": "Takara USDT",
+        "apr": 10.35
+      },
+      {
+        "name": "Takara USDC",
+        "apr": 9.59
+      },
+      {
+        "name": "MMT",
+        "apr": 34.29
       }
     ]
   }
