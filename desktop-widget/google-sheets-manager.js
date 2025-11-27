@@ -10,6 +10,75 @@ const SERVICE_ACCOUNT_FILE = path.join(__dirname, 'service-account.json');
 let authClient = null;
 
 /**
+ * Get buy price range from Google Sheet A1:B1
+ * A1: Min Price
+ * B1: Max Price
+ */
+async function getBuyPriceRange() {
+    try {
+        const auth = await getAuthClient();
+        if (!auth) {
+            return { min: 0.9, max: 1.1 }; // Default
+        }
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        const result = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!A1:B1`
+        });
+
+        const values = result.data.values?.[0];
+        if (values && values.length >= 2) {
+            const min = parseFloat(values[0]);
+            const max = parseFloat(values[1]);
+            
+            if (!isNaN(min) && !isNaN(max)) {
+                console.log(`✅ Loaded buy price range from Google Sheets: ${min} - ${max}`);
+                return { min, max };
+            }
+        }
+        
+        return { min: 0.9, max: 1.1 }; // Default
+
+    } catch (error) {
+        console.error('❌ Failed to get buy price range:', error.message);
+        return { min: 0.9, max: 1.1 };
+    }
+}
+
+/**
+ * Set buy price range to Google Sheet A1:B1
+ */
+async function setBuyPriceRange(min, max) {
+    try {
+        const auth = await getAuthClient();
+        if (!auth) {
+            console.warn('⚠️  Google Sheets not configured, cannot save buy price range');
+            return false;
+        }
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!A1:B1`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: [[min, max]]
+            }
+        });
+
+        console.log(`✅ Saved buy price range to Google Sheets: ${min} - ${max}`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Failed to save buy price range:', error.message);
+        return false;
+    }
+}
+
+/**
  * Load Service Account and create auth client
  */
 async function getAuthClient() {
@@ -70,7 +139,8 @@ async function appendHistory(historyEntries) {
                 rows.push([
                     timestamp,
                     item.name,
-                    item.apr ? item.apr.toFixed(2) : 'N/A'
+                    item.apr ? item.apr.toFixed(2) : 'N/A',
+                    item.usdcPrice ? item.usdcPrice.toString() : ''
                 ]);
             });
         });
@@ -79,10 +149,10 @@ async function appendHistory(historyEntries) {
             return true;
         }
 
-        // Append to sheet
+        // Append to sheet (starting from row 2, A1 is reserved for buy price)
         await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_NAME}!A:C`,
+            range: `${SHEET_NAME}!A2:D`,
             valueInputOption: 'USER_ENTERED',
             resource: {
                 values: rows
@@ -147,7 +217,7 @@ async function fetchAllHistory() {
 
         const result = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_NAME}!A:C`
+            range: `${SHEET_NAME}!A2:D`
         });
 
         const values = result.data.values;
@@ -185,9 +255,13 @@ async function fetchAllHistory() {
                 });
             }
 
+            const usdcPriceStr = row[3];
+            const usdcPrice = usdcPriceStr ? parseFloat(usdcPriceStr) : null;
+
             historyMap.get(timestamp).data.push({ 
                 name, 
-                apr
+                apr,
+                usdcPrice
             });
         }
 
@@ -235,5 +309,7 @@ module.exports = {
     appendHistory,
     getLastTimestamp,
     getAuthClient,
-    fetchAllHistory
+    fetchAllHistory,
+    getBuyPriceRange,
+    setBuyPriceRange
 };

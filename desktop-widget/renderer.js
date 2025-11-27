@@ -14,6 +14,8 @@ const PROTOCOL_URLS = {
 let chart = null;
 let currentHistory = [];
 let chartTimeRange = '1d'; // Default to 1 day
+let currentPriceRange = { min: 0.9, max: 1.1 }; // MMT price range
+let isAlertState = false; // Price alert state
 
 // DOM Elements
 const mainView = document.getElementById('main-view');
@@ -36,6 +38,29 @@ document.getElementById('dashboardBtn').addEventListener('click', () => {
 document.getElementById('backBtn').addEventListener('click', () => {
     ipcRenderer.send('restore-window');
     showMainView();
+});
+
+// Buy price save button
+document.getElementById('saveBuyPriceBtn').addEventListener('click', async () => {
+    const minInput = document.getElementById('minPriceInput');
+    const maxInput = document.getElementById('maxPriceInput');
+    
+    const min = parseFloat(minInput.value);
+    const max = parseFloat(maxInput.value);
+    
+    if (!isNaN(min) && !isNaN(max) && min < max) {
+        const success = await ipcRenderer.invoke('set-buy-price', { min, max });
+        if (success) {
+            currentPriceRange = { min, max };
+            isAlertState = false; // Reset alert state
+            renderMainView(); // Re-render to update colors
+            alert('價格區間已儲存!');
+        } else {
+            alert('儲存失敗');
+        }
+    } else {
+        alert('請輸入有效的價格區間 (Min < Max)');
+    }
 });
 
 // Listen for window restoration (from user action or back button)
@@ -66,21 +91,25 @@ function switchToHistoryUI() {
 }
 
 // --- Icon Generation ---
-ipcRenderer.on('generate-icon', (event, text) => {
+ipcRenderer.on('generate-icon', (event, data) => {
     const canvas = document.getElementById('iconCanvas');
     const ctx = canvas.getContext('2d');
+    
+    // Handle both old format (string) and new format (object)
+    const text = typeof data === 'object' ? data.text : data;
+    const isAlert = typeof data === 'object' ? data.isAlert : false;
 
     // Clear
     ctx.clearRect(0, 0, 32, 32);
 
-    // Background - Dark rounded rect
-    ctx.fillStyle = '#222';
+    // Background - Dark rounded rect (red if alert)
+    ctx.fillStyle = isAlert ? '#c62828' : '#222';
     ctx.beginPath();
     ctx.roundRect(0, 0, 32, 32, 8);
     ctx.fill();
 
-    // Text - Large, Green, Integer
-    ctx.fillStyle = '#00ff00';
+    // Text - Large, colored based on alert state
+    ctx.fillStyle = isAlert ? '#ffcdd2' : '#00ff00';
     ctx.font = 'bold 20px Arial'; // Larger font
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -116,7 +145,7 @@ function renderMainView() {
     }
 
     const latestEntry = currentHistory[currentHistory.length - 1];
-    const data = latestEntry.data; // Array of {name, apr, url}
+    const data = latestEntry.data; // Array of {name, apr, url, usdcPrice}
 
     // Sort by APR desc
     const sortedData = [...data].sort((a, b) => (b.apr || 0) - (a.apr || 0));
@@ -133,15 +162,47 @@ function renderMainView() {
         const url = PROTOCOL_URLS[item.name];
         const linkHtml = url ? `<a href="#" class="link-icon" onclick="openExternal('${url}'); return false;">🔗</a>` : '';
 
+        // Check for MMT USDC price and alert state (Logic moved to updateMMTPriceDisplay)
+        if (item.name === 'MMT' && item.usdcPrice !== null && item.usdcPrice !== undefined) {
+            const isPriceAlert = item.usdcPrice < currentPriceRange.min || item.usdcPrice > currentPriceRange.max;
+            if (isPriceAlert) {
+                div.classList.add('price-alert');
+                isAlertState = true;
+            }
+        }
+
         div.innerHTML = `
-      <div class="left-col">
-        <span class="result-name">${item.name}</span>
-        ${linkHtml}
-      </div>
-      <span class="result-value">${item.apr.toFixed(2)}%</span>
-    `;
+            <div class="left-col">
+                <div>
+                    <span class="result-name">${item.name}</span>
+                    ${linkHtml}
+                </div>
+            </div>
+            <span class="result-value">${item.apr.toFixed(2)}%</span>
+        `;
         resultsContainer.appendChild(div);
     });
+
+    // Update the separate MMT Price Display
+    const mmtItem = data.find(d => d.name === 'MMT');
+    updateMMTPriceDisplay(mmtItem);
+}
+
+function updateMMTPriceDisplay(item) {
+    const display = document.getElementById('mmtPriceDisplay');
+    if (item && item.usdcPrice !== null && item.usdcPrice !== undefined) {
+        const isPriceAlert = item.usdcPrice < currentPriceRange.min || item.usdcPrice > currentPriceRange.max;
+        const color = isPriceAlert ? '#f44336' : '#2196F3'; // Red if alert, Blue if normal
+        
+        display.style.display = 'block';
+        display.innerHTML = `
+            當前價格: <span style="font-family: 'Roboto Mono', monospace; font-weight: bold; color: ${color}; font-size: 16px;">
+                ${item.usdcPrice.toFixed(8)} USDC
+            </span>
+        `;
+    } else {
+        display.style.display = 'none';
+    }
 }
 
 // Expose function to window for onclick
@@ -562,6 +623,36 @@ ipcRenderer.invoke('get-history').then(history => {
         const lastTime = new Date(lastEntry.timestamp);
         const url = 'https://docs.google.com/spreadsheets/d/1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0/edit?gid=0#gid=0';
         statusDiv.innerHTML = `最後更新: <a href="#" style="color: inherit; text-decoration: none; cursor: pointer;" onclick="openExternal('${url}'); return false;">${lastTime.toLocaleTimeString()}</a>`;
+    }
+});
+
+// Load buy price on startup (from main process - sent immediately on window load)
+ipcRenderer.on('initial-buy-price', (event, range) => {
+    console.log(`📥 Received initial buy price range from main:`, range);
+    currentPriceRange = range;
+    document.getElementById('minPriceInput').value = range.min;
+    document.getElementById('maxPriceInput').value = range.max;
+    renderMainView(); // Re-render with correct buy price
+});
+
+// Fallback: Load buy price via invoke if not received via event
+ipcRenderer.invoke('get-buy-price').then(range => {
+    // Only if not already set (check if default)
+    if (currentPriceRange.min === 0.9 && currentPriceRange.max === 1.1) { 
+        currentPriceRange = range;
+        document.getElementById('minPriceInput').value = range.min;
+        document.getElementById('maxPriceInput').value = range.max;
+        renderMainView(); // Re-render with correct buy price
+    }
+});
+
+// Get alert state on startup
+ipcRenderer.invoke('get-alert-state').then(state => {
+    isAlertState = state.isAlert;
+    if (state.priceRange) {
+        currentPriceRange = state.priceRange;
+        document.getElementById('minPriceInput').value = state.priceRange.min;
+        document.getElementById('maxPriceInput').value = state.priceRange.max;
     }
 });
 

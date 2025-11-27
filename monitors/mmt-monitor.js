@@ -28,7 +28,7 @@ function log(message) {
 }
 
 /**
- * 提取 Estimated APR
+ * 提取 Estimated APR 和 Set Price Range USDC 價格
  */
 async function scrapeEstimatedAPR() {
   let browser;
@@ -47,27 +47,27 @@ async function scrapeEstimatedAPR() {
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const apr = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const pageText = document.body.innerText;
+      
       // 尋找 "Estimated APR:" 後面的百分比數值
       // 匹配模式: Estimated APR: [換行或空白] 數值%
-      const match = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
+      const aprMatch = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
+      const apr = aprMatch && aprMatch[1] ? parseFloat(aprMatch[1]) : null;
       
-      if (match && match[1]) {
-        return parseFloat(match[1]);
-      }
-      return null;
+      // 尋找 Set Price Range 中的 USDC 價格
+      // 匹配模式: 數值 USDC (例如: 1.00011662 USDC)
+      const usdcMatch = pageText.match(/([0-9]+\.[0-9]+)\s*USDC/i);
+      const usdcPrice = usdcMatch && usdcMatch[1] ? parseFloat(usdcMatch[1]) : null;
+      
+      return { apr, usdcPrice };
     });
 
-    if (apr !== null) {
-      return apr;
-    }
-
-    return null;
+    return result;
 
   } catch (error) {
     log(`❌ 爬蟲錯誤: ${error.message}`);
-    return null;
+    return { apr: null, usdcPrice: null };
   } finally {
     if (browser) {
       await browser.close();
@@ -78,10 +78,11 @@ async function scrapeEstimatedAPR() {
 /**
  * 保存數據
  */
-function saveData(apr) {
+function saveData(apr, usdcPrice = null) {
   try {
     historyManager.addEntry('mmt', {
       estimatedAPR: apr,
+      usdcPrice: usdcPrice,
       success: apr !== null
     });
     return true;
@@ -135,10 +136,13 @@ async function main() {
 
   // 單次運行模式
   if (args.includes('--once')) {
-    const apr = await scrapeEstimatedAPR();
-    if (apr !== null) {
-      console.log(`✅ MMT: ${apr}%`);
-      saveData(apr);
+    const result = await scrapeEstimatedAPR();
+    if (result.apr !== null) {
+      console.log(`✅ MMT APR: ${result.apr}%`);
+      if (result.usdcPrice !== null) {
+        console.log(`💰 USDC Price: ${result.usdcPrice} USDC`);
+      }
+      saveData(result.apr, result.usdcPrice);
     } else {
       console.log('❌ 無法提取數據');
       saveData(null);
@@ -164,11 +168,15 @@ async function main() {
 
   async function monitor() {
     iterationCount++;
-    const apr = await scrapeEstimatedAPR();
+    const result = await scrapeEstimatedAPR();
     
-    if (apr !== null) {
-      console.log(`✅ [第 ${iterationCount} 次] MMT: ${apr}%`);
-      saveData(apr);
+    if (result.apr !== null) {
+      let output = `✅ [第 ${iterationCount} 次] MMT APR: ${result.apr}%`;
+      if (result.usdcPrice !== null) {
+        output += ` | USDC: ${result.usdcPrice}`;
+      }
+      console.log(output);
+      saveData(result.apr, result.usdcPrice);
     } else {
       console.log(`❌ [第 ${iterationCount} 次] 無法提取數據`);
       saveData(null);

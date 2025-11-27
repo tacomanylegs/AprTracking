@@ -121,6 +121,79 @@ button:hover {
     height: 20px;
 }
 
+/* Buy Price Section */
+.buy-price-section {
+    background: #fff;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mmt-price-display {
+    text-align: center;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+    color: #555;
+    display: none; /* Hidden by default */
+}
+
+.buy-price-section label {
+    font-size: 12px;
+    color: #666;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.buy-price-row {
+    display: flex;
+    gap: 8px;
+}
+
+.buy-price-row input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.buy-price-row input:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.buy-price-row button {
+    flex: none;
+    width: auto;
+    padding: 8px 16px;
+    background-color: #4CAF50;
+    font-size: 12px;
+}
+
+/* Price Display */
+.price-row {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.price-value {
+    font-family: 'Roboto Mono', monospace;
+}
+
+/* Price Alert State */
+.price-alert .price-value {
+    color: #f44336 !important;
+    font-weight: bold;
+}
+
+.price-alert .result-value {
+    color: #f44336 !important;
+}
+
 /* --- Dashboard Styles (History View) --- */
 #history-view {
     display: none;

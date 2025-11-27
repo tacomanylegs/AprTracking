@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -11,6 +11,9 @@ const sheetsManager = require("./google-sheets-manager");
 let tray = null;
 let mainWindow = null;
 let updateInterval = null;
+let lastAlertedPrice = null; // Track last price that triggered alert
+let currentPriceRange = { min: 0.9, max: 1.1 }; // Current buy price range
+let isAlertState = false; // Current alert state for badge color
 
 // Configuration
 const UPDATE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
@@ -24,7 +27,7 @@ if (!fs.existsSync(path.dirname(HISTORY_FILE))) {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 350,
-    height: 370,
+    height: 450,
     show: false, // Don't show until requested
     autoHideMenuBar: true, // Hide the menu bar
     webPreferences: {
@@ -45,7 +48,7 @@ function createWindow() {
 
   // Handle user manually restoring/unmaximizing the window
   mainWindow.on("unmaximize", () => {
-    mainWindow.setSize(350, 370, true);
+    mainWindow.setSize(350, 430, true);
     mainWindow.webContents.send("window-restored");
   });
 
@@ -97,9 +100,9 @@ async function updateTrayIcon(text) {
         (prev.apr ?? 0) > (current.apr ?? 0) ? prev : current
       );
       const iconText = bestItem?.apr ? `${Math.round(bestItem.apr)}` : "?";
-      mainWindow.webContents.send("generate-icon", iconText);
+      mainWindow.webContents.send("generate-icon", { text: iconText, isAlert: isAlertState });
     } else {
-      mainWindow.webContents.send("generate-icon", text);
+      mainWindow.webContents.send("generate-icon", { text, isAlert: isAlertState });
     }
   }
 }
@@ -127,7 +130,7 @@ ipcMain.on("maximize-window", (event) => {
 ipcMain.on("restore-window", (event) => {
   if (mainWindow) {
     mainWindow.unmaximize();
-    mainWindow.setSize(350, 370, true);
+    mainWindow.setSize(350, 430, true);
   }
 });
 
@@ -146,11 +149,15 @@ async function fetchAndDisplayData() {
     // ]);
 
     // Parallel fetch
-    const [takaraUsdt, takaraUsdc, mmt] = await Promise.all([
+    const [takaraUsdt, takaraUsdc, mmtResult] = await Promise.all([
       takaralendMonitor.getAPR("USDT").catch((e) => null),
       takaralendMonitor.getAPR("USDC").catch((e) => null),
-      mmtMonitor.getAPR().catch((e) => null)
+      mmtMonitor.getAPR().catch((e) => ({ apr: null, usdcPrice: null }))
     ]);
+
+    // Handle MMT result (now returns object with apr and usdcPrice)
+    const mmtApr = mmtResult?.apr ?? null;
+    const mmtUsdcPrice = mmtResult?.usdcPrice ?? null;
 
     const results = [
       {
@@ -163,7 +170,8 @@ async function fetchAndDisplayData() {
       },
       {
         name: "MMT",
-        apr: mmt ?? null,
+        apr: mmtApr,
+        usdcPrice: mmtUsdcPrice,
       },
       // {
       //   name: "Volos V1",
@@ -174,6 +182,22 @@ async function fetchAndDisplayData() {
       //   apr: volos?.vault_2 ?? null,
       // },
     ];
+
+    // Check price alert for MMT
+    if (mmtUsdcPrice !== null) {
+      const isPriceAlert = mmtUsdcPrice < currentPriceRange.min || mmtUsdcPrice > currentPriceRange.max;
+      
+      // Only trigger notification if:
+      // 1. Price is outside range
+      // 2. Current price is different from last alerted price (new price change)
+      if (isPriceAlert && mmtUsdcPrice !== lastAlertedPrice) {
+        showPriceAlert(mmtUsdcPrice, currentPriceRange);
+        lastAlertedPrice = mmtUsdcPrice;
+        isAlertState = true;
+      } else if (!isPriceAlert) {
+        isAlertState = false;
+      }
+    }
 
     // Filter nulls and find max
     const validResults = results.filter(
@@ -295,16 +319,89 @@ ipcMain.handle("get-history", () => {
   return readHistory();
 });
 
+// Get buy price range from Google Sheets
+ipcMain.handle("get-buy-price", async () => {
+  return currentPriceRange;
+});
+
+// Set buy price range and save to Google Sheets
+ipcMain.handle("set-buy-price", async (event, range) => {
+  const min = parseFloat(range.min);
+  const max = parseFloat(range.max);
+  
+  if (isNaN(min) || isNaN(max)) return false;
+  
+  currentPriceRange = { min, max };
+  lastAlertedPrice = null; // Reset alert when buy price changes
+  isAlertState = false;
+  
+  // Save to Google Sheets
+  const success = await sheetsManager.setBuyPriceRange(min, max);
+  console.log(`💰 Buy price range updated: ${min} - ${max}`);
+  
+  // Update icon to remove alert state
+  const history = readHistory();
+  if (history.length > 0) {
+    updateTrayIcon(history[history.length - 1].data);
+  }
+  
+  return success;
+});
+
+// Get current alert state
+ipcMain.handle("get-alert-state", () => {
+  return { isAlert: isAlertState, priceRange: currentPriceRange };
+});
+
+/**
+ * Show Windows notification for price alert
+ */
+function showPriceAlert(currentPrice, range) {
+  if (!Notification.isSupported()) {
+    console.warn('⚠️  Notifications not supported');
+    return;
+  }
+
+
+  const notification = new Notification({
+    title: '⚠️ MMT 通知',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    silent: false
+  });
+
+  notification.on('click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  notification.show();
+  console.log(`🚨 Price alert triggered: ${currentPrice} (Range: ${range.min}-${range.max})`);
+}
+
 process.on("unhandledRejection", (reason, p) => {
   console.error("Unhandled Rejection at:", p, "reason:", reason);
 });
 
 app.whenReady().then(async () => {
   console.log("App Ready");
+  
+  // ========== Startup Flow ==========
+
+  // Step 0: Load buy price from Google Sheets (BEFORE creating window)
+  console.log("💰 Step 0: Loading buy price range from Google Sheets...");
+  currentPriceRange = await sheetsManager.getBuyPriceRange();
+  console.log(`✅ Buy price range loaded: ${currentPriceRange.min} - ${currentPriceRange.max}`);
+  
+  // Now create window and tray
   createWindow();
   createTray();
-
-  // ========== Startup Flow ==========
+  
+  // Send initial buy price to renderer once window is ready
+  mainWindow.webContents.once('did-finish-load', () => {
+    mainWindow.webContents.send('initial-buy-price', currentPriceRange);
+  });
 
   // Step 1: Fetch online history from Google Sheets
   console.log("📥 Step 1: Fetching online history from Google Sheets...");
@@ -373,6 +470,26 @@ app.whenReady().then(async () => {
     console.log(
       `✅ Data still valid (${Math.round(timeSinceLastUpdate / 1000)}s ago)`
     );
+    
+    // Check MMT price alert even if data is still valid
+    if (lastEntry) {
+      const mmtEntry = lastEntry.data.find(d => d.name === 'MMT');
+      if (mmtEntry && mmtEntry.usdcPrice !== null) {
+        const isPriceAlert = mmtEntry.usdcPrice < currentPriceRange.min || mmtEntry.usdcPrice > currentPriceRange.max;
+        
+        if (isPriceAlert && mmtEntry.usdcPrice !== lastAlertedPrice) {
+          console.log("🚨 Checking initial price alert on startup...");
+          showPriceAlert(mmtEntry.usdcPrice, currentPriceRange);
+          lastAlertedPrice = mmtEntry.usdcPrice;
+          isAlertState = true;
+          
+          // Update tray icon with alert color
+          updateTrayIcon(lastEntry.data);
+        } else if (!isPriceAlert) {
+          isAlertState = false;
+        }
+      }
+    }
   }
 
   // Schedule periodic updates

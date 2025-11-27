@@ -21,6 +21,17 @@
             <div class="placeholder">載入中...</div>
         </div>
 
+        <div class="buy-price-section">
+            <div id="mmtPriceDisplay" class="mmt-price-display"></div>
+            <label>💰 MMT 價格區間:</label>
+            <div class="buy-price-row">
+                <input type="number" id="minPriceInput" step="0.00000001" placeholder="Min" style="width: 80px;" />
+                <span>-</span>
+                <input type="number" id="maxPriceInput" step="0.00000001" placeholder="Max" style="width: 80px;" />
+                <button id="saveBuyPriceBtn">儲存</button>
+            </div>
+        </div>
+
         <div id="status" class="status"></div>
     </div>
 
