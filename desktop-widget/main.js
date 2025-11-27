@@ -48,7 +48,7 @@ function createWindow() {
 
   // Handle user manually restoring/unmaximizing the window
   mainWindow.on("unmaximize", () => {
-    mainWindow.setSize(350, 430, true);
+    mainWindow.setSize(350, 450, true);
     mainWindow.webContents.send("window-restored");
   });
 
@@ -130,7 +130,7 @@ ipcMain.on("maximize-window", (event) => {
 ipcMain.on("restore-window", (event) => {
   if (mainWindow) {
     mainWindow.unmaximize();
-    mainWindow.setSize(350, 430, true);
+    mainWindow.setSize(350, 450, true);
   }
 });
 
