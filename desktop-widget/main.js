@@ -141,6 +141,18 @@ async function fetchAndDisplayData() {
   if (tray) tray.setToolTip("Updating...");
 
   try {
+    // Update buy price range from Google Sheets before checking
+    const newRange = await sheetsManager.getBuyPriceRange();
+    if (newRange) {
+        currentPriceRange = newRange;
+        console.log(`🔄 Updated buy price range from Sheets: ${currentPriceRange.min} - ${currentPriceRange.max}`);
+        
+        // Update UI with new price range
+        if (mainWindow) {
+            mainWindow.webContents.send('initial-buy-price', currentPriceRange);
+        }
+    }
+
     // // Parallel fetch
     // const [takaraUsdt, takaraUsdc, volos] = await Promise.all([
     //   takaralendMonitor.getAPR("USDT").catch((e) => null),
