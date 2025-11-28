@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 **.json
 desktop-widget/history/apr-history.json
+desktop-widget/.env
