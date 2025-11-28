@@ -10,6 +10,7 @@
     "license": "ISC",
     "dependencies": {
         "chart.js": "^4.4.1",
+        "dotenv": "^17.2.3",
         "electron": "^28.1.0",
         "googleapis": "^118.0.0",
         "puppeteer": "^24.31.0"

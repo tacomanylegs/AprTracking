@@ -7,6 +7,7 @@ const mmtMonitor = require("./monitors/mmt-monitor");
 const takaralendMonitor = require("./monitors/takaralend-monitor");
 const volosMonitor = require("./monitors/volos-monitor");
 const sheetsManager = require("./google-sheets-manager");
+const TelegramNotifier = require("./telegram-notifier");
 
 let tray = null;
 let mainWindow = null;
@@ -14,6 +15,7 @@ let updateInterval = null;
 let lastAlertedPrice = null; // Track last price that triggered alert
 let currentPriceRange = { min: 0.9, max: 1.1 }; // Current buy price range
 let isAlertState = false; // Current alert state for badge color
+const telegramNotifier = new TelegramNotifier();
 
 // Configuration
 const UPDATE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
@@ -357,26 +359,46 @@ ipcMain.handle("get-alert-state", () => {
  * Show Windows notification for price alert
  */
 function showPriceAlert(currentPrice, range) {
-  if (!Notification.isSupported()) {
+  const message = `⚠️ MMT 價格警報: ${currentPrice} USDC\n(設定範圍: ${range.min} - ${range.max})`;
+  
+  // 1. Windows Notification
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: '⚠️ MMT 價格警報',
+      body: `${currentPrice} USDC (範圍: ${range.min}-${range.max})`,
+      icon: path.join(__dirname, 'assets', 'icon.png'),
+      silent: false
+    });
+
+    notification.on('click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+
+    notification.show();
+  } else {
     console.warn('⚠️  Notifications not supported');
-    return;
   }
 
+  // 2. Telegram Notification
+  const mmtUrl = 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b';
+  const tgMessage = `
+<b>⚠️ MMT 價格警報</b>
 
-  const notification = new Notification({
-    title: '⚠️ MMT 通知',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
-    silent: false
+💰 <b>當前價格:</b> ${currentPrice} USDC
+🎯 <b>設定範圍:</b> ${range.min} - ${range.max}
+
+<a href="${mmtUrl}">🔗 前往 MMT Finance</a>
+
+<i>請檢查您的倉位，若需調整通知範圍，請至桌面小工具設定。</i>
+`;
+
+  telegramNotifier.sendMessage(tgMessage).catch(err => {
+    console.error('❌ Telegram notification failed:', err.message);
   });
 
-  notification.on('click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-
-  notification.show();
   console.log(`🚨 Price alert triggered: ${currentPrice} (Range: ${range.min}-${range.max})`);
 }
 
