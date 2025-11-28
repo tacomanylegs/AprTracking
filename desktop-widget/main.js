@@ -376,8 +376,7 @@ function showPriceAlert(currentPrice, range) {
   // 1. Windows Notification
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: '⚠️ MMT 價格警報',
-      body: `${currentPrice} USDC (範圍: ${range.min}-${range.max})`,
+      title: '⚠️ MMT 通知',
       icon: path.join(__dirname, 'assets', 'icon.png'),
       silent: false
     });
