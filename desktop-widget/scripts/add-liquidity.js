@@ -79,11 +79,12 @@ function initializeSDK(requirePrivateKey = true) {
   });
   
   // 如果不需要私鑰（例如只讀操作）
-  if (!requirePrivateKey || !CONFIG.privateKey) {
-    if (requirePrivateKey && !CONFIG.privateKey) {
-      throw new Error('SUI_PRIVATE_KEY not set in .env');
-    }
+  if (!requirePrivateKey) {
     return { suiClient, mmtSdk, keypair: null, address: null };
+  }
+  
+  if (!CONFIG.privateKey) {
+    throw new Error('SUI_PRIVATE_KEY not set in .env');
   }
   
   // 解析私鑰 (支援 suiprivkey、hex 或 base64)
@@ -107,7 +108,7 @@ function initializeSDK(requirePrivateKey = true) {
       }
     }
   } catch (e) {
-    throw new Error(`Failed to parse private key: ${e.message}`);
+    throw new Error('Failed to parse private key: invalid format (expected suiprivkey, hex, or base64)');
   }
   
   const address = keypair.getPublicKey().toSuiAddress();
@@ -185,17 +186,12 @@ function calculateTickRange(pool, rangePercent) {
 }
 
 // ============ Find User Positions ============
-async function findUserPositions(mmtSdk, address, poolId) {
+async function findUserPositions(mmtSdk, address, poolId, pool = null) {
   log(`Finding positions for ${address} in pool ${poolId}...`);
   
   try {
-    const pools = await mmtSdk.Pool.getAllPools();
-    const pool = pools.find(p => p.poolId === poolId);
-    
-    if (!pool) {
-      log('Pool not found in pools list');
-      return [];
-    }
+    // 如果沒有傳入 pool，才獲取所有 pools
+    const pools = pool ? [pool] : await mmtSdk.Pool.getAllPools();
     
     const positions = await mmtSdk.Position.getAllUserPositions(address, pools);
     const poolPositions = positions.filter(p => p.poolId === poolId);
@@ -456,8 +452,8 @@ async function main() {
     // 2. 獲取 Pool 資料
     const pool = await fetchPoolData(mmtSdk, CONFIG.poolId);
     
-    // 3. 查找現有倉位 (先檢查倉位狀態)
-    const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId);
+    // 3. 查找現有倉位 (先檢查倉位狀態，傳入已獲取的 pool 避免重複請求)
+    const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId, pool);
     
     // 4. 檢查倉位是否已離開價格區間
     if (existingPositions.length === 0) {
