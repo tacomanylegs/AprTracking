@@ -9,7 +9,11 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "@mmt-finance/clmm-sdk": "^1.0.0",
+        "@mysten/sui.js": "^0.54.1",
+        "bn.js": "^5.2.1",
         "chart.js": "^4.4.1",
+        "decimal.js": "^10.4.3",
         "dotenv": "^17.2.3",
         "electron": "^28.1.0",
         "googleapis": "^118.0.0",
