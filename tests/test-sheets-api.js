@@ -1,4 +1,4 @@
-const sheetsManager = require('./google-sheets-manager');
+const sheetsManager = require('../src/services/google-sheets-manager');
 
 /**
  * Test uploading fake data to Google Sheets

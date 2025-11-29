@@ -16,7 +16,7 @@
  *   node add-liquidity.js --force            # 強制執行（不檢查是否在範圍內）
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');

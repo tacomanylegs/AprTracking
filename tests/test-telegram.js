@@ -1,4 +1,4 @@
-const TelegramNotifier = require('./telegram-notifier');
+const TelegramNotifier = require('../src/services/telegram-notifier');
 
 async function runTest() {
     console.log('🚀 Testing Telegram Notification...');

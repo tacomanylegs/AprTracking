@@ -3,12 +3,12 @@ const path = require("path");
 const fs = require("fs");
 
 // Import monitors
-const mmtMonitor = require("./monitors/mmt-monitor");
-const takaralendMonitor = require("./monitors/takaralend-monitor");
-const volosMonitor = require("./monitors/volos-monitor");
-const sheetsManager = require("./google-sheets-manager");
-const TelegramNotifier = require("./telegram-notifier");
-const rebalancer = require("./scripts/add-liquidity");
+const mmtMonitor = require("./src/monitors/mmt-monitor");
+const takaralendMonitor = require("./src/monitors/takaralend-monitor");
+const volosMonitor = require("./src/monitors/volos-monitor");
+const sheetsManager = require("./src/services/google-sheets-manager");
+const TelegramNotifier = require("./src/services/telegram-notifier");
+const rebalancer = require("./src/scripts/add-liquidity");
 
 let tray = null;
 let mainWindow = null;

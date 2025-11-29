@@ -9,7 +9,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
-const historyManager = require('../history-manager');
+const historyManager = require('../services/history-manager');
 
 const CONFIG = {
   poolId: '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
