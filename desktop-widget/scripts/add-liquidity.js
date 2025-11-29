@@ -12,7 +12,7 @@
  * 使用方式:
  *   node add-liquidity.js                    # 執行 (只在需要時)
  *   node add-liquidity.js --dry-run          # 模擬執行（不送交易）
- *   node add-liquidity.js --range 0.02       # 使用 ±0.02% 範圍
+ *   node add-liquidity.js --range 0.02       # 使用 ±0.01% 範圍
  *   node add-liquidity.js --force            # 強制執行（不檢查是否在範圍內）
  */
 
@@ -96,19 +96,12 @@ function initializeSDK(requirePrivateKey = true) {
     if (privateKeyStr.startsWith('suiprivkey')) {
       const { secretKey } = decodeSuiPrivateKey(privateKeyStr);
       keypair = Ed25519Keypair.fromSecretKey(secretKey);
-    } else {
-      // 嘗試 hex 格式
-      try {
-        const privateKeyBytes = Buffer.from(privateKeyStr.replace('0x', ''), 'hex');
-        keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
-      } catch (e) {
-        // 嘗試 base64 格式
-        const privateKeyBytes = Buffer.from(privateKeyStr, 'base64');
-        keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
-      }
+    } 
+    else {
+      throw new Error('Failed to parse private key: invalid format (expected suiprivkey)');
     }
   } catch (e) {
-    throw new Error('Failed to parse private key: invalid format (expected suiprivkey, hex, or base64)');
+    throw new Error('Failed to parse private key: invalid format (expected suiprivkey)');
   }
   
   const address = keypair.getPublicKey().toSuiAddress();
@@ -328,7 +321,7 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
     // 判斷是否只有單一代幣（離開區間的情況）
     if (hasOnlyCoinX) {
       // 只有 coinX，使用單邊添加流動性（會自動 swap 部分成 coinY）
-      log('Using single-sided liquidity (TokenX only, will auto-swap to balance)...');
+      log(`Using single-sided liquidity (${pool.tokenX?.symbol || 'TokenX'} only, will auto-swap to balance)...`);
       
       await mmtSdk.Pool.addLiquiditySingleSidedV2({
         txb,
@@ -347,7 +340,7 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
       
     } else if (hasOnlyCoinY) {
       // 只有 coinY，使用單邊添加流動性（會自動 swap 部分成 coinX）
-      log('Using single-sided liquidity (TokenY only, will auto-swap to balance)...');
+      log(`Using single-sided liquidity (${pool.tokenY?.symbol || 'TokenY'} only, will auto-swap to balance)...`);
       
       await mmtSdk.Pool.addLiquiditySingleSidedV2({
         txb,
