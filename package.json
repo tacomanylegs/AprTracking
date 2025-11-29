@@ -1,16 +1,22 @@
 {
-  "name": "aprtracking",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "puppeteer": "^24.30.0"
-  }
+    "name": "apr-desktop-widget",
+    "version": "1.0.0",
+    "description": "DeFi APR Monitor Widget",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron ."
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@mmt-finance/clmm-sdk": "^1.0.0",
+        "@mysten/sui": "^1.28.2",
+        "bn.js": "^5.2.1",
+        "chart.js": "^4.4.1",
+        "decimal.js": "^10.4.3",
+        "dotenv": "^17.2.3",
+        "electron": "^28.1.0",
+        "googleapis": "^118.0.0",
+        "puppeteer": "^24.31.0"
+    }
 }
