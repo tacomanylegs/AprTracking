@@ -35,6 +35,8 @@ let lastRebalanceResult = null; // 最近一次換倉結果
 const telegramNotifier = new TelegramNotifier();
 
 // Configuration
+const WINDOW_WIDTH = 350;
+const WINDOW_HEIGHT = 645;
 const UPDATE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const REBALANCE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const HISTORY_FILE = path.join(__dirname, "history", "apr-history.json");
@@ -46,8 +48,8 @@ if (!fs.existsSync(path.dirname(HISTORY_FILE))) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 350,
-    height: 450,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
     show: false, // Don't show until requested
     autoHideMenuBar: true, // Hide the menu bar
     webPreferences: {
@@ -68,7 +70,7 @@ function createWindow() {
 
   // Handle user manually restoring/unmaximizing the window
   mainWindow.on("unmaximize", () => {
-    mainWindow.setSize(350, 450, true);
+    mainWindow.setSize(WINDOW_WIDTH, WINDOW_HEIGHT, true);
     mainWindow.webContents.send("window-restored");
   });
 
@@ -164,7 +166,7 @@ ipcMain.on("maximize-window", (event) => {
 ipcMain.on("restore-window", (event) => {
   if (mainWindow) {
     mainWindow.unmaximize();
-    mainWindow.setSize(350, 450, true);
+    mainWindow.setSize(WINDOW_WIDTH, WINDOW_HEIGHT, true);
   }
 });
 

@@ -46,8 +46,27 @@
                     <span class="status-label">最後檢查:</span>
                     <span id="rebalanceLastCheckTime" class="status-value">--</span>
                 </div>
-                <div id="rebalanceResult" class="rebalance-result" style="display: none;"></div>
-                <button id="manualRebalanceBtn" class="manual-rebalance-btn">💫 手動執行</button>
+                <div id="rebalanceResultsContainer" class="rebalance-results-container" style="display: none;">
+                    <div id="rebalanceResultsList" class="rebalance-results-list"></div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="manualRebalanceBtn" class="manual-rebalance-btn">💫 手動執行</button>
+                    <button id="viewHistoryBtn" class="view-history-btn">📋 歷史紀錄</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rebalance History Modal -->
+        <div id="rebalanceHistoryModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>換倉歷史紀錄</h3>
+                    <button id="closeHistoryModal" class="close-btn">✕</button>
+                </div>
+                <div id="rebalanceHistoryList" class="history-list"></div>
+                <div class="modal-footer">
+                    <button id="closeHistoryBtn" class="secondary-btn" style="width: auto; padding: 8px 16px;">關閉</button>
+                </div>
             </div>
         </div>
 

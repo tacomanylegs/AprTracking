@@ -220,11 +220,21 @@ let rebalanceState = {
 
 const rebalanceToggleBtn = document.getElementById('rebalanceToggle');
 const manualRebalanceBtn = document.getElementById('manualRebalanceBtn');
+const viewHistoryBtn = document.getElementById('viewHistoryBtn');
 const rebalanceStatusDiv = document.querySelector('.rebalance-status');
 const rebalanceStatusText = document.getElementById('rebalanceStatusText');
 const rebalanceLastCheckDiv = document.getElementById('rebalanceLastCheck');
 const rebalanceLastCheckTime = document.getElementById('rebalanceLastCheckTime');
-const rebalanceResultDiv = document.getElementById('rebalanceResult');
+const rebalanceResultsContainer = document.getElementById('rebalanceResultsContainer');
+const rebalanceResultsList = document.getElementById('rebalanceResultsList');
+const rebalanceHistoryModal = document.getElementById('rebalanceHistoryModal');
+const rebalanceHistoryList = document.getElementById('rebalanceHistoryList');
+const closeHistoryModal = document.getElementById('closeHistoryModal');
+const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+
+// Store all rebalance results for scrolling history
+let rebalanceResults = [];
+let lastDisplayedDigest = null; // Track last displayed digest to avoid duplicates
 
 // Toggle rebalance on/off
 rebalanceToggleBtn.addEventListener('click', async () => {
@@ -263,6 +273,42 @@ manualRebalanceBtn.addEventListener('click', async () => {
         updateRebalanceUI();
     }
 });
+
+// View history button
+viewHistoryBtn.addEventListener('click', () => {
+    displayRebalanceHistory();
+    rebalanceHistoryModal.style.display = 'flex';
+});
+
+// Close modal buttons
+closeHistoryModal.addEventListener('click', () => {
+    rebalanceHistoryModal.style.display = 'none';
+});
+
+closeHistoryBtn.addEventListener('click', () => {
+    rebalanceHistoryModal.style.display = 'none';
+});
+
+// Close modal when clicking outside
+rebalanceHistoryModal.addEventListener('click', (e) => {
+    if (e.target === rebalanceHistoryModal) {
+        rebalanceHistoryModal.style.display = 'none';
+    }
+});
+
+function displayRebalanceHistory() {
+    if (rebalanceResults.length === 0) {
+        rebalanceHistoryList.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">暫無換倉紀錄</div>';
+        return;
+    }
+    
+    rebalanceHistoryList.innerHTML = rebalanceResults.map((result, index) => `
+        <div class="history-item ${result.resultClass}">
+            <a href="#" onclick="window.openExternal('${result.txUrl}'); return false;" class="history-item-link">${result.digest}</a>
+            <span class="history-item-time">${result.timeStr}</span>
+        </div>
+    `).join('');
+}
 
 // Listen for rebalance status changes from main process
 ipcRenderer.on('rebalance-status-changed', (event, status) => {
@@ -332,22 +378,49 @@ function updateRebalanceUI() {
     // Update result details
     if (rebalanceState.lastResult && rebalanceState.lastResult.digest) {
         const resultClass = rebalanceState.lastResult.success ? 'success' : 'error';
-        const poolId = rebalanceState.lastResult.poolId 
-            ? rebalanceState.lastResult.poolId.substring(0, 10) + '...' 
-            : 'N/A';
-        rebalanceResultDiv.className = `rebalance-result ${resultClass}`;
-        rebalanceResultDiv.innerHTML = `
-            <strong>Pool:</strong> ${poolId}<br/>
-            <strong>Digest:</strong> ${rebalanceState.lastResult.digest.substring(0, 16)}...<br/>
-            <strong>時間:</strong> ${new Date(rebalanceState.lastResult.timestamp).toLocaleString('zh-TW')}
+        const digest = rebalanceState.lastResult.digest;
+        const digestShort = digest.substring(0, 12);
+        const txUrl = `https://suiscan.xyz/mainnet/tx/${digest}`;
+        
+        // Format timestamp safely
+        let timeStr = '未知';
+        if (rebalanceState.lastResult.timestamp) {
+            const date = new Date(rebalanceState.lastResult.timestamp);
+            if (!isNaN(date.getTime())) {
+                timeStr = date.toLocaleTimeString('zh-TW');
+            }
+        }
+        
+        // Only add to results list if it's a new digest
+        if (digest !== lastDisplayedDigest) {
+            rebalanceResults.unshift({
+                digest: digestShort,
+                txUrl: txUrl,
+                timeStr: timeStr,
+                resultClass: resultClass
+            });
+            
+            // Keep last 10 for history
+            if (rebalanceResults.length > 10) {
+                rebalanceResults.pop();
+            }
+            
+            lastDisplayedDigest = digest;
+        }
+        
+        // Render results list (only show the latest one)
+        rebalanceResultsList.innerHTML = `
+            <div class="rebalance-result ${rebalanceResults[0].resultClass}">
+                <a href="#" onclick="window.openExternal('${rebalanceResults[0].txUrl}'); return false;" class="rebalance-result-tx">${rebalanceResults[0].digest}</a>
+                <span class="rebalance-result-time">${rebalanceResults[0].timeStr}</span>
+            </div>
         `;
-        rebalanceResultDiv.style.display = 'block';
+        
+        rebalanceResultsContainer.style.display = 'block';
     } else if (rebalanceState.lastResult && rebalanceState.lastResult.error) {
-        rebalanceResultDiv.className = 'rebalance-result error';
-        rebalanceResultDiv.innerHTML = `<strong>錯誤信息:</strong><br/>${rebalanceState.lastResult.error}`;
-        rebalanceResultDiv.style.display = 'block';
+        rebalanceResultsContainer.style.display = 'none';
     } else {
-        rebalanceResultDiv.style.display = 'none';
+        rebalanceResultsContainer.style.display = 'none';
     }
 }
 
