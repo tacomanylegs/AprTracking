@@ -3,20 +3,24 @@
  * 
  * 自動重新平衡流動性倉位：
  * 1. 讀取 Pool 當前價格 (sqrtPrice)
- * 2. 計算 ±0.01% 價格範圍對應的 tick
- * 3. 贖回舊倉位流動性
- * 4. 開新倉位並加入流動性
+ * 2. 查找現有倉位，檢查是否已離開價格區間
+ * 3. 如果倉位已離開區間，才執行重新平衡：
+ *    - 贖回舊倉位流動性
+ *    - 計算新的 ±0.01% 價格範圍
+ *    - 開新倉位並加入流動性
  * 
  * 使用方式:
- *   node add-liquidity.js                    # 執行
+ *   node add-liquidity.js                    # 執行 (只在需要時)
  *   node add-liquidity.js --dry-run          # 模擬執行（不送交易）
  *   node add-liquidity.js --range 0.02       # 使用 ±0.02% 範圍
+ *   node add-liquidity.js --force            # 強制執行（不檢查是否在範圍內）
  */
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
-const { SuiClient } = require('@mysten/sui.js/client');
-const { Ed25519Keypair } = require('@mysten/sui.js/keypairs/ed25519');
-const { TransactionBlock } = require('@mysten/sui.js/transactions');
+const { SuiClient } = require('@mysten/sui/client');
+const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
+const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');
+const { Transaction } = require('@mysten/sui/transactions');
 const { MmtSDK, TickMath } = require('@mmt-finance/clmm-sdk');
 const BN = require('bn.js');
 const Decimal = require('decimal.js');
@@ -25,11 +29,8 @@ const Decimal = require('decimal.js');
 const CONFIG = {
   // 從 .env 讀取
   privateKey: process.env.SUI_PRIVATE_KEY,
-  address: process.env.SUI_ADDRESS,
   poolId: process.env.MMT_POOL_ID || '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-  
-  // 預設價格範圍 ±0.01%
-  defaultRangePercent: 0.0001,
+  defaultRangePercent: parseFloat(process.env.DEFAULT_RANGE_PERCENT || '0.0001'),
   
   // Sui RPC
   rpcUrl: 'https://fullnode.mainnet.sui.io',
@@ -54,6 +55,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     dryRun: args.includes('--dry-run'),
+    force: args.includes('--force'),
     rangePercent: CONFIG.defaultRangePercent,
   };
   
@@ -81,29 +83,34 @@ function initializeSDK(requirePrivateKey = true) {
     if (requirePrivateKey && !CONFIG.privateKey) {
       throw new Error('SUI_PRIVATE_KEY not set in .env');
     }
-    return { suiClient, mmtSdk, keypair: null, address: CONFIG.address || null };
+    return { suiClient, mmtSdk, keypair: null, address: null };
   }
   
-  // 解析私鑰 (支援 hex 或 base64)
+  // 解析私鑰 (支援 suiprivkey、hex 或 base64)
   let keypair;
+  let privateKeyStr = CONFIG.privateKey.trim();
+  
   try {
-    // 嘗試 hex 格式
-    const privateKeyBytes = Buffer.from(CONFIG.privateKey.replace('0x', ''), 'hex');
-    keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
-  } catch (e) {
-    try {
-      // 嘗試 base64 格式
-      const privateKeyBytes = Buffer.from(CONFIG.privateKey, 'base64');
-      keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
-    } catch (e2) {
-      throw new Error(`Failed to parse private key: ${e2.message}`);
+    // 如果是 suiprivkey 格式，使用標準解碼
+    if (privateKeyStr.startsWith('suiprivkey')) {
+      const { secretKey } = decodeSuiPrivateKey(privateKeyStr);
+      keypair = Ed25519Keypair.fromSecretKey(secretKey);
+    } else {
+      // 嘗試 hex 格式
+      try {
+        const privateKeyBytes = Buffer.from(privateKeyStr.replace('0x', ''), 'hex');
+        keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
+      } catch (e) {
+        // 嘗試 base64 格式
+        const privateKeyBytes = Buffer.from(privateKeyStr, 'base64');
+        keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
+      }
     }
+  } catch (e) {
+    throw new Error(`Failed to parse private key: ${e.message}`);
   }
   
   const address = keypair.getPublicKey().toSuiAddress();
-  if (CONFIG.address && address !== CONFIG.address) {
-    log(`Warning: Derived address ${address} differs from SUI_ADDRESS ${CONFIG.address}`, 'WARN');
-  }
   
   return { suiClient, mmtSdk, keypair, address };
 }
@@ -122,6 +129,7 @@ async function fetchPoolData(mmtSdk, poolId) {
   log(`Current sqrtPrice: ${pool.currentSqrtPrice}`);
   log(`Current tick: ${pool.currentTickIndex}`);
   log(`Tick spacing: ${pool.tickSpacing}`);
+  log(`Rewarders: ${pool.rewarders ? pool.rewarders.length : 0}`);
   
   return pool;
 }
@@ -201,9 +209,27 @@ async function findUserPositions(mmtSdk, address, poolId) {
   }
 }
 
+// ============ Check if Position is Out of Range ============
+function checkPositionOutOfRange(position, pool) {
+  // 獲取當前 tick
+  const currentTick = parseInt(pool.currentTickIndex);
+  
+  // 獲取倉位的 tick 範圍
+  const lowerTick = position.lowerTick;
+  const upperTick = position.upperTick;
+  
+  // 檢查當前價格是否在倉位範圍內
+  const isInRange = currentTick >= lowerTick && currentTick <= upperTick;
+  
+  log(`Position ${position.objectId}: tick range [${lowerTick}, ${upperTick}], current tick: ${currentTick}`);
+  log(`Position status: ${isInRange ? '✅ IN RANGE' : '❌ OUT OF RANGE'}`);
+  
+  return !isInRange;
+}
+
 // ============ Build Rebalance Transaction ============
 async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickRange, existingPositions) {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   txb.setSender(address);
   
   const poolParams = {
@@ -216,10 +242,24 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
   // 1. 如果有舊倉位，先贖回流動性
   let coinX = null;
   let coinY = null;
+  let hasOnlyCoinX = false;
+  let hasOnlyCoinY = false;
+  
+  // 檢查當前價格相對於舊倉位的位置，判斷會取回哪種幣
+  const currentTick = parseInt(pool.currentTickIndex);
   
   for (const pos of existingPositions) {
     if (pos.liquidity && !pos.liquidity.isZero()) {
       log(`Removing liquidity from position ${pos.objectId}...`);
+      
+      // 判斷倉位狀態：價格在區間下方只會取回 coinX，在區間上方只會取回 coinY
+      if (currentTick < pos.lowerTick) {
+        hasOnlyCoinX = true;
+        log(`Position is BELOW range - will receive only TokenX`);
+      } else if (currentTick > pos.upperTick) {
+        hasOnlyCoinY = true;
+        log(`Position is ABOVE range - will receive only TokenY`);
+      }
       
       // Collect fees first
       const { feeCoinA, feeCoinB } = mmtSdk.Pool.collectFee(
@@ -228,13 +268,29 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
         pos.objectId,
         undefined
       );
+
+      // Collect rewards if any
+      if (pool.rewarders && pool.rewarders.length > 0) {
+        log(`Collecting rewards from position ${pos.objectId}...`);
+        const rewardCoins = mmtSdk.Pool.collectAllRewards(
+          txb,
+          poolParams,
+          pool.rewarders,
+          pos.objectId,
+          undefined
+        );
+        
+        if (rewardCoins && rewardCoins.length > 0) {
+          txb.transferObjects(rewardCoins, txb.pure.address(address));
+        }
+      }
       
       // Remove all liquidity
       const { removeLpCoinA, removeLpCoinB } = mmtSdk.Pool.removeLiquidity(
         txb,
         poolParams,
         pos.objectId,
-        pos.liquidity.toString(),
+        BigInt(pos.liquidity.toString()),
         BigInt(0), // min_amount_x
         BigInt(0), // min_amount_y
         undefined
@@ -271,23 +327,65 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
     undefined // 不直接轉移，稍後加流動性
   );
   
-  // 3. 如果有幣，加入流動性
+  // 3. 根據情況選擇添加流動性的方式
   if (coinX && coinY) {
-    log('Adding liquidity to new position...');
-    
-    const { coinA: leftoverA, coinB: leftoverB } = await mmtSdk.Pool.addLiquidity(
-      txb,
-      poolParams,
-      newPosition,
-      coinX,
-      coinY,
-      BigInt(0), // min_amount_x
-      BigInt(0), // min_amount_y
-      undefined
-    );
-    
-    // 轉移剩餘幣和新倉位給用戶
-    txb.transferObjects([leftoverA, leftoverB, newPosition], txb.pure.address(address));
+    // 判斷是否只有單一代幣（離開區間的情況）
+    if (hasOnlyCoinX) {
+      // 只有 coinX，使用單邊添加流動性（會自動 swap 部分成 coinY）
+      log('Using single-sided liquidity (TokenX only, will auto-swap to balance)...');
+      
+      await mmtSdk.Pool.addLiquiditySingleSidedV2({
+        txb,
+        pool: poolParams,
+        position: newPosition,
+        inputCoin: coinX,
+        isXtoY: true, // 輸入的是 tokenX
+        transferToAddress: address, // 讓 SDK 處理剩餘代幣的 transfer
+        limitSqrtPrice: undefined, // 使用默認限價
+        slippagePercentage: 1, // 1% 滑點
+        useMvr: true,
+      });
+      
+      // 轉移 coinY（應該是空的）和新倉位給用戶
+      txb.transferObjects([coinY, newPosition], txb.pure.address(address));
+      
+    } else if (hasOnlyCoinY) {
+      // 只有 coinY，使用單邊添加流動性（會自動 swap 部分成 coinX）
+      log('Using single-sided liquidity (TokenY only, will auto-swap to balance)...');
+      
+      await mmtSdk.Pool.addLiquiditySingleSidedV2({
+        txb,
+        pool: poolParams,
+        position: newPosition,
+        inputCoin: coinY,
+        isXtoY: false, // 輸入的是 tokenY
+        transferToAddress: address, // 讓 SDK 處理剩餘代幣的 transfer
+        limitSqrtPrice: undefined, // 使用默認限價
+        slippagePercentage: 1, // 1% 滑點
+        useMvr: true,
+      });
+      
+      // 轉移 coinX（應該是空的）和新倉位給用戶
+      txb.transferObjects([coinX, newPosition], txb.pure.address(address));
+      
+    } else {
+      // 正常情況：有兩種代幣，使用雙邊添加流動性
+      log('Adding liquidity with both tokens...');
+      
+      const { coinA: leftoverA, coinB: leftoverB } = await mmtSdk.Pool.addLiquidity(
+        txb,
+        poolParams,
+        newPosition,
+        coinX,
+        coinY,
+        BigInt(0), // min_amount_x
+        BigInt(0), // min_amount_y
+        undefined
+      );
+      
+      // 轉移剩餘幣和新倉位給用戶
+      txb.transferObjects([leftoverA, leftoverB, newPosition], txb.pure.address(address));
+    }
   } else {
     // 沒有舊幣，只轉移空倉位
     txb.transferObjects([newPosition], txb.pure.address(address));
@@ -318,12 +416,10 @@ async function executeTransaction(suiClient, keypair, txb, dryRun = false) {
   
   log('Executing transaction...');
   
-  // 導入 RawSigner
-  const { RawSigner } = require('@mysten/sui.js/dist/cjs/signers/raw-signer.js');
-  const signer = new RawSigner(keypair, suiClient);
-  
-  const result = await signer.signAndExecuteTransactionBlock({
-    transactionBlock: txb,
+  // 使用 Ed25519Keypair 簽署交易
+  const result = await suiClient.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: txb,
     options: {
       showEffects: true,
       showEvents: true,
@@ -347,51 +443,63 @@ async function main() {
   log('MMT Add Liquidity Script');
   log('========================================');
   log(`Mode: ${options.dryRun ? 'DRY RUN' : 'EXECUTE'}`);
+  log(`Force: ${options.force ? 'YES' : 'NO'}`);
   log(`Range: ±${(options.rangePercent * 100).toFixed(4)}%`);
   log(`Pool ID: ${CONFIG.poolId}`);
   log('');
   
   try {
-    // 1. 初始化 (dry-run 模式不需要私鑰來獲取 pool 資料)
-    const requirePrivateKey = !options.dryRun;
-    const { suiClient, mmtSdk, keypair, address } = initializeSDK(requirePrivateKey);
-    
-    if (address) {
-      log(`Wallet address: ${address}`);
-    } else {
-      log('No wallet configured (read-only mode)');
-    }
+    // 1. 初始化
+    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    log(`Wallet address: ${address}`);
     
     // 2. 獲取 Pool 資料
     const pool = await fetchPoolData(mmtSdk, CONFIG.poolId);
     
-    // 3. 計算 tick 範圍
-    const tickRange = calculateTickRange(pool, options.rangePercent);
-    
-    // 如果是 dry-run 且沒有私鑰，到這裡就結束
-    if (options.dryRun && !keypair) {
-      log('');
-      log('========================================');
-      logSuccess('Dry run completed (read-only mode)');
-      log('Pool data and tick range calculated successfully.');
-      log('To execute transactions, set SUI_PRIVATE_KEY in .env');
-      log('========================================');
-      
-      console.log(JSON.stringify({
-        success: true,
-        dryRun: true,
-        tickRange,
-        poolId: CONFIG.poolId,
-        readOnlyMode: true,
-      }));
-      
-      process.exit(0);
-    }
-    
-    // 4. 查找現有倉位
+    // 3. 查找現有倉位 (先檢查倉位狀態)
     const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId);
     
-    // 5. 建構交易
+    // 4. 檢查倉位是否已離開價格區間
+    if (existingPositions.length === 0) {
+      log('');
+      log('⚠️  No existing positions found in this pool.');
+      log('Creating a new position...');
+    } else {
+      // 檢查所有倉位是否都在範圍內
+      let anyOutOfRange = false;
+      for (const pos of existingPositions) {
+        if (checkPositionOutOfRange(pos, pool)) {
+          anyOutOfRange = true;
+        }
+      }
+      
+      if (!anyOutOfRange && !options.force) {
+        log('');
+        log('========================================');
+        logSuccess('All positions are still IN RANGE');
+        log('No rebalance needed. Use --force to rebalance anyway.');
+        log('========================================');
+        
+        console.log(JSON.stringify({
+          success: true,
+          rebalanceNeeded: false,
+          message: 'All positions are in range',
+          poolId: CONFIG.poolId,
+        }));
+        
+        process.exit(0);
+      }
+      
+      if (options.force && !anyOutOfRange) {
+        log('');
+        log('⚠️  Positions are in range, but --force flag is set. Proceeding with rebalance...');
+      }
+    }
+    
+    // 5. 計算新的 tick 範圍
+    const tickRange = calculateTickRange(pool, options.rangePercent);
+    
+    // 6. 建構交易
     const txb = await buildRebalanceTransaction(
       mmtSdk,
       suiClient,
@@ -401,10 +509,10 @@ async function main() {
       existingPositions
     );
     
-    // 6. 執行交易
+    // 7. 執行交易
     const result = await executeTransaction(suiClient, keypair, txb, options.dryRun);
     
-    // 7. 輸出結果
+    // 8. 輸出結果
     log('');
     log('========================================');
     if (result.success) {
@@ -421,6 +529,7 @@ async function main() {
     console.log(JSON.stringify({
       success: result.success,
       dryRun: options.dryRun,
+      rebalanceNeeded: true,
       digest: result.digest || null,
       tickRange,
       poolId: CONFIG.poolId,
@@ -452,6 +561,7 @@ module.exports = {
   fetchPoolData,
   calculateTickRange,
   findUserPositions,
+  checkPositionOutOfRange,
   buildRebalanceTransaction,
   executeTransaction,
 };
