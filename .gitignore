@@ -3,5 +3,5 @@ node_modules/
 .DS_Store
 **.json
 desktop-widget/history/apr-history.json
-desktop-widget/.env
-desktop-widget/.env
+# .env can be located anywhere - use --env-path or ENV_PATH to specify location
+.env

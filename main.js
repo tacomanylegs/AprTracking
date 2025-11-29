@@ -2,6 +2,28 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, Notification } = require("elect
 const path = require("path");
 const fs = require("fs");
 
+// ============ Setup .env Path ============
+// 優先順序：1. --env-path 命令行參數 2. ENV_PATH 環境變數 3. 預設位置
+// 設定環境變數供子進程使用
+function setupEnvPath() {
+  const args = process.argv.slice(1); // Electron 會加入應用路徑作為第一個參數
+  const envPathIdx = args.indexOf('--env-path');
+  
+  if (envPathIdx !== -1 && args[envPathIdx + 1]) {
+    // 從命令行參數讀取
+    process.env.ENV_PATH = args[envPathIdx + 1];
+    console.log(`📝 ENV_PATH set from --env-path: ${process.env.ENV_PATH}`);
+  } else if (!process.env.ENV_PATH) {
+    // 如果環境變數未設定，使用預設位置
+    process.env.ENV_PATH = path.join(__dirname, '..', '.env');
+    console.log(`📝 ENV_PATH set to default: ${process.env.ENV_PATH}`);
+  } else {
+    console.log(`📝 ENV_PATH from environment: ${process.env.ENV_PATH}`);
+  }
+}
+
+setupEnvPath();
+
 // Import monitors
 const mmtMonitor = require("./src/monitors/mmt-monitor");
 const takaralendMonitor = require("./src/monitors/takaralend-monitor");

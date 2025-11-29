@@ -20,7 +20,7 @@
 
 ### 設定方式
 
-1. 複製 `.env.example` 到 `.env`
+1. 複製 `.env.example` 到 `.env`（放在專案外層或任意位置）
 2. 填入 Sui 錢包私鑰：
 
 ```bash
@@ -28,13 +28,31 @@ SUI_PRIVATE_KEY=your_hex_or_base64_private_key
 MMT_POOL_ID=0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b
 ```
 
-3. 手動測試：
+3. 手動測試（.env 在預設位置時）：
 
 ```bash
 cd desktop-widget
-run-add-liquidity.bat --dry-run   # 模擬執行
-run-add-liquidity.bat             # 實際執行
-run-add-liquidity.bat --range 0.02  # 使用 ±0.02% 範圍
+run-add-liquidity.bat --dry-run              # 模擬執行
+run-add-liquidity.bat                        # 實際執行
+run-add-liquidity.bat --range 0.02           # 使用 ±0.02% 範圍
+```
+
+4. 如果 .env 不在預設位置，使用 `--env-path` 參數指定：
+
+```bash
+run-add-liquidity.bat --env-path "D:\config\.env" --dry-run
+run-add-liquidity.bat --env-path "C:\Users\User\.env"
+```
+
+5. 或透過環境變數指定：
+
+```powershell
+$env:ENV_PATH = "D:\custom\path\.env"
+node add-liquidity.js --dry-run
+
+# 或使用 set 命令
+set ENV_PATH=D:\custom\path\.env
+node add-liquidity.js
 ```
 
 ### 工作原理
@@ -43,6 +61,12 @@ run-add-liquidity.bat --range 0.02  # 使用 ±0.02% 範圍
 - 當價格超出範圍時觸發通知
 - 如果 `.env` 設定了 `SUI_PRIVATE_KEY`，會自動執行調倉
 - 調倉完成後更新價格範圍並發送 Telegram 通知
+
+#### .env 檔案位置搜尋順序
+
+1. **命令行參數** `--env-path` - 最高優先級
+2. **環境變數** `ENV_PATH` - 次優先級  
+3. **預設位置** `../../../.env` (相對於 add-liquidity.js) - 最低優先級
 
 ## 🛠️ 安裝
 

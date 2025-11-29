@@ -10,13 +10,42 @@
  *    - 開新倉位並加入流動性
  * 
  * 使用方式:
- *   node add-liquidity.js                    # 執行 (只在需要時)
- *   node add-liquidity.js --dry-run          # 模擬執行（不送交易）
- *   node add-liquidity.js --range 0.02       # 使用 ±0.01% 範圍
- *   node add-liquidity.js --force            # 強制執行（不檢查是否在範圍內）
+ *   node add-liquidity.js                           # 執行 (只在需要時)
+ *   node add-liquidity.js --dry-run                 # 模擬執行（不送交易）
+ *   node add-liquidity.js --range 0.02              # 使用 ±0.01% 範圍
+ *   node add-liquidity.js --force                   # 強制執行（不檢查是否在範圍內）
+ *   node add-liquidity.js --env-path /path/to/.env  # 指定 .env 檔案位置
+ * 
+ * 環境變數:
+ *   ENV_PATH=/path/to/.env node add-liquidity.js    # 透過環境變數指定 .env 位置
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
+// ============ Load .env File ============
+// 優先順序：1. --env-path 命令行參數 2. ENV_PATH 環境變數 3. 預設位置
+function loadDotenv() {
+  const args = process.argv.slice(2);
+  const envPathIdx = args.indexOf('--env-path');
+  let envPath;
+  
+  if (envPathIdx !== -1 && args[envPathIdx + 1]) {
+    // 從命令行參數讀取
+    envPath = args[envPathIdx + 1];
+    console.log(`📝 Using --env-path: ${envPath}`);
+  } else if (process.env.ENV_PATH) {
+    // 從環境變數讀取
+    envPath = process.env.ENV_PATH;
+    console.log(`📝 Using ENV_PATH: ${envPath}`);
+  } else {
+    // 使用預設位置
+    envPath = require('path').join(__dirname, '..', '..', '..', '.env');
+    console.log(`📝 Using default path: ${envPath}`);
+  }
+  
+  require('dotenv').config({ path: envPath });
+  return envPath;
+}
+
+const resolvedEnvPath = loadDotenv();
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');
@@ -74,6 +103,9 @@ function parseArgs() {
   if (rangeIdx !== -1 && args[rangeIdx + 1]) {
     options.rangePercent = parseFloat(args[rangeIdx + 1]) / 100;
   }
+  
+  // --env-path 已在 loadDotenv() 中處理，這裡只需過濾掉它
+  // 防止它被當作未知參數
   
   return options;
 }

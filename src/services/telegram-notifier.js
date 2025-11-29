@@ -1,11 +1,28 @@
 const https = require('https');
 
-// Try to load dotenv, but don't crash if it's missing
-try {
-    require('dotenv').config();
-} catch (error) {
+// ============ Load .env File ============
+// 優先順序：1. ENV_PATH 環境變數 2. 預設位置
+function loadDotenv() {
+  let envPath;
+  
+  if (process.env.ENV_PATH) {
+    // 從環境變數讀取
+    envPath = process.env.ENV_PATH;
+    console.log(`📝 TelegramNotifier using ENV_PATH: ${envPath}`);
+  } else {
+    // 使用預設位置
+    envPath = require('path').join(__dirname, '..', '..', '..', '.env');
+    console.log(`📝 TelegramNotifier using default path: ${envPath}`);
+  }
+  
+  try {
+    require('dotenv').config({ path: envPath });
+  } catch (error) {
     // dotenv not available
+  }
 }
+
+loadDotenv();
 
 class TelegramNotifier {
     constructor() {
