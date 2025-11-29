@@ -20,32 +20,9 @@
  *   ENV_PATH=/path/to/.env node add-liquidity.js    # 透過環境變數指定 .env 位置
  */
 
-// ============ Load .env File ============
-// 優先順序：1. --env-path 命令行參數 2. ENV_PATH 環境變數 3. 預設位置
-function loadDotenv() {
-  const args = process.argv.slice(2);
-  const envPathIdx = args.indexOf('--env-path');
-  let envPath;
-  
-  if (envPathIdx !== -1 && args[envPathIdx + 1]) {
-    // 從命令行參數讀取
-    envPath = args[envPathIdx + 1];
-    console.log(`📝 Using --env-path: ${envPath}`);
-  } else if (process.env.ENV_PATH) {
-    // 從環境變數讀取
-    envPath = process.env.ENV_PATH;
-    console.log(`📝 Using ENV_PATH: ${envPath}`);
-  } else {
-    // 使用預設位置
-    envPath = require('path').join(__dirname, '..', '..', '..', '.env');
-    console.log(`📝 Using default path: ${envPath}`);
-  }
-  
-  require('dotenv').config({ path: envPath });
-  return envPath;
-}
 
-const resolvedEnvPath = loadDotenv();
+const envLoader = require('../utils/env-loader');
+envLoader.load();
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');
@@ -104,7 +81,7 @@ function parseArgs() {
     options.rangePercent = parseFloat(args[rangeIdx + 1]) / 100;
   }
   
-  // --env-path 已在 loadDotenv() 中處理，這裡只需過濾掉它
+  // --env-path 已在 envLoader.load() 中處理，這裡只需過濾掉它
   // 防止它被當作未知參數
   
   return options;

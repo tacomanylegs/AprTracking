@@ -32,6 +32,25 @@
             </div>
         </div>
 
+        <div id="rebalanceCard" class="rebalance-card">
+            <div class="rebalance-header">
+                <span class="rebalance-title">🔄 自動換倉狀態</span>
+                <button id="rebalanceToggle" class="rebalance-toggle-btn">啟用</button>
+            </div>
+            <div class="rebalance-body">
+                <div class="rebalance-status">
+                    <span class="status-label">狀態:</span>
+                    <span id="rebalanceStatusText" class="status-value">等待中...</span>
+                </div>
+                <div id="rebalanceLastCheck" class="rebalance-last-check" style="display: none;">
+                    <span class="status-label">最後檢查:</span>
+                    <span id="rebalanceLastCheckTime" class="status-value">--</span>
+                </div>
+                <div id="rebalanceResult" class="rebalance-result" style="display: none;"></div>
+                <button id="manualRebalanceBtn" class="manual-rebalance-btn">💫 手動執行</button>
+            </div>
+        </div>
+
         <div id="status" class="status"></div>
     </div>
 

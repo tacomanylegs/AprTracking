@@ -129,6 +129,170 @@ button:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Rebalance Card Section */
+.rebalance-card {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.rebalance-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.rebalance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.rebalance-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rebalance-toggle-btn {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: none;
+}
+
+.rebalance-toggle-btn:hover {
+    background-color: #059669;
+    transform: scale(1.05);
+}
+
+.rebalance-toggle-btn.disabled {
+    background-color: #ef4444;
+}
+
+.rebalance-toggle-btn.disabled:hover {
+    background-color: #dc2626;
+}
+
+.rebalance-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rebalance-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.status-label {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.status-value {
+    color: #1e293b;
+    font-weight: 600;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.rebalance-status.active .status-value {
+    color: #10b981;
+}
+
+.rebalance-status.error .status-value {
+    color: #ef4444;
+}
+
+.rebalance-status.processing .status-value {
+    color: #f59e0b;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.rebalance-last-check {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.rebalance-result {
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    background: #efe6ff;
+    border-left: 3px solid #8b5cf6;
+}
+
+.rebalance-result.success {
+    background: #dcfce7;
+    border-left-color: #10b981;
+}
+
+.rebalance-result.error {
+    background: #fee2e2;
+    border-left-color: #ef4444;
+}
+
+.manual-rebalance-btn {
+    flex: 1;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 4px;
+}
+
+.manual-rebalance-btn:hover {
+    background-color: #2563eb;
+    transform: translateY(-1px);
+}
+
+.manual-rebalance-btn:active {
+    transform: translateY(0);
+}
+
+.manual-rebalance-btn:disabled {
+    background-color: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .mmt-price-display {
     text-align: center;
     margin-bottom: 8px;

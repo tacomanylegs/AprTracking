@@ -210,6 +210,157 @@ window.openExternal = (url) => {
     shell.openExternal(url);
 };
 
+// --- Rebalance Status Management ---
+let rebalanceState = {
+    enabled: false,
+    lastResult: null,
+    lastCheckTime: null,
+    isProcessing: false
+};
+
+const rebalanceToggleBtn = document.getElementById('rebalanceToggle');
+const manualRebalanceBtn = document.getElementById('manualRebalanceBtn');
+const rebalanceStatusDiv = document.querySelector('.rebalance-status');
+const rebalanceStatusText = document.getElementById('rebalanceStatusText');
+const rebalanceLastCheckDiv = document.getElementById('rebalanceLastCheck');
+const rebalanceLastCheckTime = document.getElementById('rebalanceLastCheckTime');
+const rebalanceResultDiv = document.getElementById('rebalanceResult');
+
+// Toggle rebalance on/off
+rebalanceToggleBtn.addEventListener('click', async () => {
+    const newState = !rebalanceState.enabled;
+    const result = await ipcRenderer.invoke('set-rebalance-enabled', newState);
+    rebalanceState.enabled = result;
+    updateRebalanceUI();
+});
+
+// Manual rebalance trigger
+manualRebalanceBtn.addEventListener('click', async () => {
+    if (rebalanceState.isProcessing) {
+        alert('換倉正在進行中，請稍候...');
+        return;
+    }
+    
+    manualRebalanceBtn.disabled = true;
+    rebalanceState.isProcessing = true;
+    updateRebalanceUI();
+    
+    try {
+        const result = await ipcRenderer.invoke('trigger-rebalance');
+        rebalanceState.lastResult = result;
+        rebalanceState.lastCheckTime = new Date();
+        updateRebalanceUI();
+    } catch (error) {
+        console.error('❌ Manual rebalance failed:', error);
+        rebalanceState.lastResult = {
+            success: false,
+            error: error.message
+        };
+        updateRebalanceUI();
+    } finally {
+        rebalanceState.isProcessing = false;
+        manualRebalanceBtn.disabled = false;
+        updateRebalanceUI();
+    }
+});
+
+// Listen for rebalance status changes from main process
+ipcRenderer.on('rebalance-status-changed', (event, status) => {
+    rebalanceState.enabled = status.enabled;
+    updateRebalanceUI();
+});
+
+// Listen for rebalance started
+ipcRenderer.on('rebalance-started', () => {
+    rebalanceState.isProcessing = true;
+    updateRebalanceUI();
+});
+
+// Listen for rebalance completed
+ipcRenderer.on('rebalance-completed', (event, result) => {
+    rebalanceState.lastResult = result;
+    rebalanceState.lastCheckTime = new Date();
+    rebalanceState.isProcessing = false;
+    updateRebalanceUI();
+});
+
+function updateRebalanceUI() {
+    // Update toggle button state
+    if (rebalanceState.enabled) {
+        rebalanceToggleBtn.textContent = '✓ 已啟用';
+        rebalanceToggleBtn.classList.remove('disabled');
+    } else {
+        rebalanceToggleBtn.textContent = '✗ 已禁用';
+        rebalanceToggleBtn.classList.add('disabled');
+    }
+    
+    // Update status display
+    rebalanceStatusDiv.classList.remove('active', 'error', 'processing');
+    
+    if (rebalanceState.isProcessing) {
+        rebalanceStatusDiv.classList.add('processing');
+        rebalanceStatusText.textContent = '⏳ 進行中...';
+    } else if (rebalanceState.lastResult) {
+        if (rebalanceState.lastResult.success) {
+            rebalanceStatusDiv.classList.add('active');
+            if (rebalanceState.lastResult.rebalanceExecuted) {
+                rebalanceStatusText.textContent = '✅ 換倉成功';
+            } else if (rebalanceState.lastResult.rebalanceNeeded === false) {
+                rebalanceStatusText.textContent = '✓ 無需換倉';
+            } else {
+                rebalanceStatusText.textContent = '✓ 檢查完成';
+            }
+        } else {
+            rebalanceStatusDiv.classList.add('error');
+            rebalanceStatusText.textContent = `❌ 失敗: ${rebalanceState.lastResult.error || '未知錯誤'}`;
+        }
+    } else {
+        rebalanceStatusText.textContent = rebalanceState.enabled ? '✓ 已啟用' : '✗ 已禁用';
+    }
+    
+    // Update last check time
+    if (rebalanceState.lastCheckTime) {
+        rebalanceLastCheckDiv.style.display = 'flex';
+        const timeStr = rebalanceState.lastCheckTime instanceof Date 
+            ? rebalanceState.lastCheckTime.toLocaleTimeString() 
+            : new Date(rebalanceState.lastCheckTime).toLocaleTimeString();
+        rebalanceLastCheckTime.textContent = timeStr;
+    } else {
+        rebalanceLastCheckDiv.style.display = 'none';
+    }
+    
+    // Update result details
+    if (rebalanceState.lastResult && rebalanceState.lastResult.digest) {
+        const resultClass = rebalanceState.lastResult.success ? 'success' : 'error';
+        const poolId = rebalanceState.lastResult.poolId 
+            ? rebalanceState.lastResult.poolId.substring(0, 10) + '...' 
+            : 'N/A';
+        rebalanceResultDiv.className = `rebalance-result ${resultClass}`;
+        rebalanceResultDiv.innerHTML = `
+            <strong>Pool:</strong> ${poolId}<br/>
+            <strong>Digest:</strong> ${rebalanceState.lastResult.digest.substring(0, 16)}...<br/>
+            <strong>時間:</strong> ${new Date(rebalanceState.lastResult.timestamp).toLocaleString('zh-TW')}
+        `;
+        rebalanceResultDiv.style.display = 'block';
+    } else if (rebalanceState.lastResult && rebalanceState.lastResult.error) {
+        rebalanceResultDiv.className = 'rebalance-result error';
+        rebalanceResultDiv.innerHTML = `<strong>錯誤信息:</strong><br/>${rebalanceState.lastResult.error}`;
+        rebalanceResultDiv.style.display = 'block';
+    } else {
+        rebalanceResultDiv.style.display = 'none';
+    }
+}
+
+// Load initial rebalance status
+ipcRenderer.invoke('get-rebalance-status').then(status => {
+    rebalanceState.enabled = status.enabled;
+    rebalanceState.lastResult = status.lastResult;
+    if (status.lastResult && status.lastResult.timestamp) {
+        rebalanceState.lastCheckTime = new Date(status.lastResult.timestamp);
+    }
+    updateRebalanceUI();
+});
+
 // Function to update status with hyperlink
 function updateStatusWithLink() {
     const time = new Date().toLocaleTimeString();
