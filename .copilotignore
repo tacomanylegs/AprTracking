@@ -1,0 +1,13 @@
+# 環境變數檔案
+.env
+.env.*
+*.env
+
+# 服務帳戶金鑰
+service-account.json
+**/service-account.json
+
+# 私鑰相關
+*.pem
+*.key
+*.p12
