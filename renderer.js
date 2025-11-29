@@ -5,7 +5,9 @@ const Chart = require('chart.js/auto');
 const PROTOCOL_URLS = {
   'Takara USDT': 'https://app.takaralend.com/market/USD%E2%82%AE0',
   'Takara USDC': 'https://app.takaralend.com/market/USDC',
-  'MMT': 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
+
+  'MMT 0.01%': 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
+  'MMT 0.001%': 'https://app.mmt.finance/liquidity/0x737ec6a4d3ed0c7e6cc18d8ba04e7ffd4806b726c97efd89867597368c4d06a9',
   'Volos V1': 'https://www.volosui.com/vaults',
   'Volos V2': 'https://www.volosui.com/vaults'
 };
@@ -147,29 +149,37 @@ function renderMainView() {
     const latestEntry = currentHistory[currentHistory.length - 1];
     const data = latestEntry.data; // Array of {name, apr, url, usdcPrice}
 
-    // Sort by APR desc
-    const sortedData = [...data].sort((a, b) => (b.apr || 0) - (a.apr || 0));
+    // Sort by APR desc - valid APRs first, then by value
+    const sortedData = [...data].sort((a, b) => {
+        const aApr = a.apr !== null && a.apr !== undefined ? a.apr : -Infinity;
+        const bApr = b.apr !== null && b.apr !== undefined ? b.apr : -Infinity;
+        return bApr - aApr;
+    });
 
     resultsContainer.innerHTML = '';
 
+    let championIndex = 0;
     sortedData.forEach((item, index) => {
-        if (item.apr === null || item.apr === undefined) return;
-
         const div = document.createElement('div');
         div.className = 'result-item';
-        if (index === 0) div.classList.add('champion');
+        if (item.apr !== null && item.apr !== undefined && championIndex === 0) {
+            div.classList.add('champion');
+            championIndex++;
+        }
 
         const url = PROTOCOL_URLS[item.name];
         const linkHtml = url ? `<a href="#" class="link-icon" onclick="openExternal('${url}'); return false;">🔗</a>` : '';
 
         // Check for MMT USDC price and alert state (Logic moved to updateMMTPriceDisplay)
-        if (item.name === 'MMT' && item.usdcPrice !== null && item.usdcPrice !== undefined) {
+        if (item.name === 'MMT 0.01%' && item.usdcPrice !== null && item.usdcPrice !== undefined) {
             const isPriceAlert = item.usdcPrice < currentPriceRange.min || item.usdcPrice > currentPriceRange.max;
             if (isPriceAlert) {
                 div.classList.add('price-alert');
                 isAlertState = true;
             }
         }
+
+        const aprDisplay = (item.apr !== null && item.apr !== undefined) ? `${item.apr.toFixed(2)}%` : '<span style="color: #666; font-size: 14px;">Loading...</span>';
 
         div.innerHTML = `
             <div class="left-col">
@@ -178,13 +188,13 @@ function renderMainView() {
                     ${linkHtml}
                 </div>
             </div>
-            <span class="result-value">${item.apr.toFixed(2)}%</span>
+            <span class="result-value">${aprDisplay}</span>
         `;
         resultsContainer.appendChild(div);
     });
 
     // Update the separate MMT Price Display
-    const mmtItem = data.find(d => d.name === 'MMT');
+    const mmtItem = data.find(d => d.name === 'MMT 0.01%');
     updateMMTPriceDisplay(mmtItem);
 }
 

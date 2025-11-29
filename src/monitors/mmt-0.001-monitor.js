@@ -1,22 +1,24 @@
 /**
- * MMT Finance Estimated APR 爬蟲
+ * MMT Finance 0.001% 池 Estimated APR 爬蟲
  * 使用方式:
- *   node mmt-monitor.js --once    # 單次查詢
- *   node mmt-monitor.js            # 持續監控
- *   node mmt-monitor.js --stats    # 查看統計
+ *   node mmt-0.001-monitor.js --once    # 單次查詢
+ *   node mmt-0.001-monitor.js            # 持續監控
+ *   node mmt-0.001-monitor.js --stats    # 查看統計
  */
 
 const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
 const historyManager = require('../services/history-manager');
 
-const CONFIG = {
-  poolId: '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-  webUrl: 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-  targetAPR: 23.26,
-  updateInterval: 5 * 60 * 1000, // 5 分鐘
-  timeout: 30000
+const POOL = {
+  name: 'MMT 0.001%',
+  url: 'https://app.mmt.finance/liquidity/0x737ec6a4d3ed0c7e6cc18d8ba04e7ffd4806b726c97efd89867597368c4d06a9',
+  poolKey: 'mmt-0.001',
+  targetAPR: 0
+};
+
+const DEFAULT_CONFIG = {
+  timeout: 30000,
+  updateInterval: 30 * 60 * 1000 // 30 minutes
 };
 
 /**
@@ -29,10 +31,12 @@ function log(message) {
 
 /**
  * 提取 Estimated APR 和 Set Price Range USDC 價格
+ * @param {string} url 目標 URL
  */
-async function scrapeEstimatedAPR() {
+async function scrapeEstimatedAPR(url) {
   let browser;
   try {
+    console.log(`[DEBUG] Launching browser for URL: ${url}`);
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -40,12 +44,14 @@ async function scrapeEstimatedAPR() {
 
     const page = await browser.newPage();
     
-    await page.goto(CONFIG.webUrl, { 
+    console.log(`[DEBUG] Navigating to ${url}...`);
+    await page.goto(url, { 
       waitUntil: 'networkidle2', 
-      timeout: CONFIG.timeout 
+      timeout: DEFAULT_CONFIG.timeout 
     });
 
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log(`[DEBUG] Waiting for page to settle...`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     const result = await page.evaluate(() => {
       const pageText = document.body.innerText;
@@ -55,21 +61,26 @@ async function scrapeEstimatedAPR() {
       const aprMatch = pageText.match(/Estimated APR:\s*[\n\r\s]*([0-9.]+)%/i);
       const apr = aprMatch && aprMatch[1] ? parseFloat(aprMatch[1]) : null;
       
-      // 尋找 Set Price Range 中的 USDC 價格
-      // 匹配模式: 數值 USDC (例如: 1.00011662 USDC)
-      const usdcMatch = pageText.match(/([0-9]+\.[0-9]+)\s*USDC/i);
-      const usdcPrice = usdcMatch && usdcMatch[1] ? parseFloat(usdcMatch[1]) : null;
+      // 尋找 "Set Price Range" 段落，然後從該段落提取 USDC 價格
+      // 確保只抓取當前池子的價格範圍，不會抓到其他地方的價格
+      let usdcPrice = null;
+      const priceRangeMatch = pageText.match(/Set Price Range[\s\S]*?([0-9]+\.[0-9]+)\s*USDC/i);
+      if (priceRangeMatch && priceRangeMatch[1]) {
+        usdcPrice = parseFloat(priceRangeMatch[1]);
+      }
       
       return { apr, usdcPrice };
     });
 
+    console.log(`[DEBUG] Scrape result:`, result);
     return result;
 
   } catch (error) {
-    log(`❌ 爬蟲錯誤: ${error.message}`);
+    log(`❌ 爬蟲錯誤 (${url}): ${error.message}`);
     return { apr: null, usdcPrice: null };
   } finally {
     if (browser) {
+      console.log(`[DEBUG] Closing browser for ${url}`);
       await browser.close();
     }
   }
@@ -77,10 +88,12 @@ async function scrapeEstimatedAPR() {
 
 /**
  * 保存數據
+ * @param {number} apr APR 數值
+ * @param {number} usdcPrice USDC 價格
  */
 function saveData(apr, usdcPrice = null) {
   try {
-    historyManager.addEntry('mmt', {
+    historyManager.addEntry(POOL.poolKey, {
       estimatedAPR: apr,
       usdcPrice: usdcPrice,
       success: apr !== null
@@ -93,13 +106,20 @@ function saveData(apr, usdcPrice = null) {
 }
 
 /**
+ * 獲取 APR
+ */
+async function getAPR() {
+  return await scrapeEstimatedAPR(POOL.url);
+}
+
+/**
  * 顯示統計信息
  */
 function showStatistics() {
   try {
-    const history = historyManager.getStats('mmt');
+    const history = historyManager.getStats(POOL.poolKey);
     if (history.length === 0) {
-      log('⚠️  還沒有數據 (今日)');
+      log(`⚠️  還沒有數據 (今日) - ${POOL.poolKey}`);
       return;
     }
 
@@ -112,15 +132,13 @@ function showStatistics() {
     const current = values[values.length - 1].toFixed(2);
 
     console.log('\n╔═══════════════════════════════════════════════════════════╗');
-    console.log('║              MMT Finance APR 統計信息                    ║');
+    console.log(`║              ${POOL.name} APR 統計信息                     ║`);
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
     console.log(`📊 數據點: ${successData.length} (今日)`);
     console.log(`📈 當前值: ${current}%`);
     console.log(`📊 平均值: ${avg}%`);
     console.log(`⬇️  最小值: ${min}%`);
     console.log(`⬆️  最大值: ${max}%`);
-    console.log(`🎯 目標值: ${CONFIG.targetAPR}%`);
-    console.log(`📍 差異值: ${(current - CONFIG.targetAPR).toFixed(2)}%`);
     console.log('\n');
 
   } catch (error) {
@@ -136,17 +154,21 @@ async function main() {
 
   // 單次運行模式
   if (args.includes('--once')) {
-    const result = await scrapeEstimatedAPR();
+    console.log(`🔍 Testing ${POOL.name}...\n`);
+    console.log(`⏳ Checking ${POOL.name}...`);
+    console.log(`   URL: ${POOL.url}`);
+    const result = await scrapeEstimatedAPR(POOL.url);
     if (result.apr !== null) {
-      console.log(`✅ MMT APR: ${result.apr}%`);
+      console.log(`✅ ${POOL.name} APR: ${result.apr}%`);
       if (result.usdcPrice !== null) {
         console.log(`💰 USDC Price: ${result.usdcPrice} USDC`);
       }
       saveData(result.apr, result.usdcPrice);
     } else {
-      console.log('❌ 無法提取數據');
+      console.log('❌ Failed to extract data');
       saveData(null);
     }
+    console.log('\n✅ Test complete');
     process.exit(0);
   }
 
@@ -158,27 +180,28 @@ async function main() {
 
   // 持續監控模式
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║    MMT Finance Estimated APR 持續監控器                 ║');
+  console.log(`║    MMT Finance 0.001% APR 持續監控器                     ║`);
   console.log('╚═══════════════════════════════════════════════════════════╝\n');
   
   log('🚀 啟動持續監控模式');
-  log(`⏱️  更新間隔: ${CONFIG.updateInterval / 1000 / 60} 分鐘\n`);
+  log(`⏱️  更新間隔: ${DEFAULT_CONFIG.updateInterval / 1000 / 60} 分鐘\n`);
 
   let iterationCount = 0;
 
   async function monitor() {
     iterationCount++;
-    const result = await scrapeEstimatedAPR();
+    
+    const result = await scrapeEstimatedAPR(POOL.url);
     
     if (result.apr !== null) {
-      let output = `✅ [第 ${iterationCount} 次] MMT APR: ${result.apr}%`;
+      let output = `✅ [第 ${iterationCount} 次] ${POOL.name} APR: ${result.apr}%`;
       if (result.usdcPrice !== null) {
         output += ` | USDC: ${result.usdcPrice}`;
       }
       console.log(output);
       saveData(result.apr, result.usdcPrice);
     } else {
-      console.log(`❌ [第 ${iterationCount} 次] 無法提取數據`);
+      console.log(`❌ [第 ${iterationCount} 次] ${POOL.name} 無法提取數據`);
       saveData(null);
     }
 
@@ -188,7 +211,7 @@ async function main() {
   }
 
   await monitor();
-  setInterval(monitor, CONFIG.updateInterval);
+  setInterval(monitor, DEFAULT_CONFIG.updateInterval);
 
   process.on('SIGINT', () => {
     console.log('\n\n───────────────────────────────────────────────────────────');
@@ -205,5 +228,6 @@ if (require.main === module) {
 
 module.exports = {
   scrapeEstimatedAPR,
-  getAPR: scrapeEstimatedAPR
+  getAPR,
+  POOL
 };

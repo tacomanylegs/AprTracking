@@ -16,7 +16,8 @@ const envLoader = require("./src/utils/env-loader");
 envLoader.load();
 
 // Import monitors
-const mmtMonitor = require("./src/monitors/mmt-monitor");
+const mmt001Monitor = require("./src/monitors/mmt-0.01-monitor");
+const mmt0001Monitor = require("./src/monitors/mmt-0.001-monitor");
 const takaralendMonitor = require("./src/monitors/takaralend-monitor");
 const volosMonitor = require("./src/monitors/volos-monitor");
 const sheetsManager = require("./src/services/google-sheets-manager");
@@ -197,15 +198,20 @@ async function fetchAndDisplayData() {
     // ]);
 
     // Parallel fetch
-    const [takaraUsdt, takaraUsdc, mmtResult] = await Promise.all([
-      takaralendMonitor.getAPR("USDT").catch((e) => null),
-      takaralendMonitor.getAPR("USDC").catch((e) => null),
-      mmtMonitor.getAPR().catch((e) => ({ apr: null, usdcPrice: null }))
+    console.log("Starting parallel fetch for all pools...");
+    const [takaraUsdt, takaraUsdc, mmt001Result, mmt0001Result] = await Promise.all([
+      takaralendMonitor.getAPR("USDT").catch((e) => { console.error("Takara USDT Error:", e); return null; }),
+      takaralendMonitor.getAPR("USDC").catch((e) => { console.error("Takara USDC Error:", e); return null; }),
+      mmt001Monitor.getAPR().catch((e) => { console.error("MMT 0.01% Error:", e); return { apr: null, usdcPrice: null }; }),
+      mmt0001Monitor.getAPR().catch((e) => { console.error("MMT 0.001% Error:", e); return { apr: null, usdcPrice: null }; })
     ]);
 
-    // Handle MMT result (now returns object with apr and usdcPrice)
-    const mmtApr = mmtResult?.apr ?? null;
-    const mmtUsdcPrice = mmtResult?.usdcPrice ?? null;
+    console.log("Fetch results:", {
+      takaraUsdt,
+      takaraUsdc,
+      mmt001: mmt001Result,
+      mmt0001: mmt0001Result
+    });
 
     const results = [
       {
@@ -217,21 +223,19 @@ async function fetchAndDisplayData() {
         apr: takaraUsdc ?? null,
       },
       {
-        name: "MMT",
-        apr: mmtApr,
-        usdcPrice: mmtUsdcPrice,
+        name: "MMT 0.01%",
+        apr: mmt001Result?.apr ?? null,
+        usdcPrice: mmt001Result?.usdcPrice ?? null,
       },
-      // {
-      //   name: "Volos V1",
-      //   apr: volos?.vault_1 ?? null,
-      // },
-      // {
-      //   name: "Volos V2",
-      //   apr: volos?.vault_2 ?? null,
-      // },
+      {
+        name: "MMT 0.001%",
+        apr: mmt0001Result?.apr ?? null,
+        usdcPrice: mmt0001Result?.usdcPrice ?? null,
+      },
     ];
 
-    // Check price alert for MMT
+    // Check price alert for MMT (Use 0.01% pool as reference)
+    const mmtUsdcPrice = mmt001Result?.usdcPrice ?? null;
     if (mmtUsdcPrice !== null) {
       const isPriceAlert = mmtUsdcPrice < currentPriceRange.min || mmtUsdcPrice > currentPriceRange.max;
       
@@ -644,8 +648,15 @@ app.whenReady().then(async () => {
   const now = new Date().getTime();
   const timeSinceLastUpdate = now - lastUpdateTime;
 
-  if (!lastEntry || timeSinceLastUpdate >= UPDATE_INTERVAL_MS) {
-    console.log("⏰ Data expired, fetching new data...");
+  // Check if the last entry has the new MMT structure
+  const hasNewStructure = lastEntry && lastEntry.data.some(d => d.name === 'MMT 0.01%');
+
+  if (!lastEntry || timeSinceLastUpdate >= UPDATE_INTERVAL_MS || !hasNewStructure) {
+    if (!hasNewStructure) {
+      console.log("⚠️  Old data structure detected, forcing update...");
+    } else {
+      console.log("⏰ Data expired, fetching new data...");
+    }
     fetchAndDisplayData();
   } else {
     console.log(
@@ -654,7 +665,7 @@ app.whenReady().then(async () => {
     
     // Check MMT price alert even if data is still valid
     if (lastEntry) {
-      const mmtEntry = lastEntry.data.find(d => d.name === 'MMT');
+      const mmtEntry = lastEntry.data.find(d => d.name === 'MMT 0.01%');
       if (mmtEntry && mmtEntry.usdcPrice !== null) {
         const isPriceAlert = mmtEntry.usdcPrice < currentPriceRange.min || mmtEntry.usdcPrice > currentPriceRange.max;
         
