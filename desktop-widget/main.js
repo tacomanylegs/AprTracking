@@ -8,17 +8,22 @@ const takaralendMonitor = require("./monitors/takaralend-monitor");
 const volosMonitor = require("./monitors/volos-monitor");
 const sheetsManager = require("./google-sheets-manager");
 const TelegramNotifier = require("./telegram-notifier");
+const rebalancer = require("./scripts/add-liquidity");
 
 let tray = null;
 let mainWindow = null;
 let updateInterval = null;
+let rebalanceInterval = null;
 let lastAlertedPrice = null; // Track last price that triggered alert
 let currentPriceRange = { min: 0.9, max: 1.1 }; // Current buy price range
 let isAlertState = false; // Current alert state for badge color
+let autoRebalanceEnabled = true; // 自動換倉開關
+let lastRebalanceResult = null; // 最近一次換倉結果
 const telegramNotifier = new TelegramNotifier();
 
 // Configuration
 const UPDATE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const REBALANCE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const HISTORY_FILE = path.join(__dirname, "history", "apr-history.json");
 
 // Ensure history directory exists
@@ -71,6 +76,20 @@ function createTray() {
   const contextMenu = Menu.buildFromTemplate([
     { label: "Open History", click: () => mainWindow.show() },
     { label: "Refresh Now", click: () => fetchAndDisplayData() },
+    { type: "separator" },
+    { 
+      label: "Auto Rebalance", 
+      type: "checkbox",
+      checked: autoRebalanceEnabled,
+      click: (menuItem) => {
+        autoRebalanceEnabled = menuItem.checked;
+        console.log(`🔄 Auto rebalance ${autoRebalanceEnabled ? 'enabled' : 'disabled'}`);
+        if (mainWindow) {
+          mainWindow.webContents.send('rebalance-status-changed', { enabled: autoRebalanceEnabled });
+        }
+      }
+    },
+    { label: "Rebalance Now", click: () => runRebalanceCheck() },
     { type: "separator" },
     {
       label: "Quit",
@@ -367,6 +386,27 @@ ipcMain.handle("get-alert-state", () => {
   return { isAlert: isAlertState, priceRange: currentPriceRange };
 });
 
+// Get rebalance status
+ipcMain.handle("get-rebalance-status", () => {
+  return { 
+    enabled: autoRebalanceEnabled, 
+    lastResult: lastRebalanceResult,
+    intervalMs: REBALANCE_INTERVAL_MS,
+  };
+});
+
+// Toggle auto rebalance
+ipcMain.handle("set-rebalance-enabled", (event, enabled) => {
+  autoRebalanceEnabled = enabled;
+  console.log(`🔄 Auto rebalance ${autoRebalanceEnabled ? 'enabled' : 'disabled'}`);
+  return autoRebalanceEnabled;
+});
+
+// Manually trigger rebalance
+ipcMain.handle("trigger-rebalance", async () => {
+  return await runRebalanceCheck();
+});
+
 /**
  * Show Windows notification for price alert
  */
@@ -411,6 +451,99 @@ function showPriceAlert(currentPrice, range) {
   });
 
   console.log(`🚨 Price alert triggered: ${currentPrice} (Range: ${range.min}-${range.max})`);
+}
+
+/**
+ * 執行自動換倉檢查
+ */
+async function runRebalanceCheck() {
+  if (!autoRebalanceEnabled) {
+    console.log('⏸️  Auto rebalance is disabled, skipping...');
+    return;
+  }
+
+  console.log('🔄 Running auto rebalance check...');
+  
+  // 通知 UI 開始換倉檢查
+  if (mainWindow) {
+    mainWindow.webContents.send('rebalance-started');
+  }
+
+  try {
+    const result = await rebalancer.runAutoRebalance({
+      dryRun: false,
+      force: false,
+    });
+
+    lastRebalanceResult = {
+      ...result,
+      timestamp: new Date().toISOString(),
+    };
+
+    // 通知 UI 換倉結果
+    if (mainWindow) {
+      mainWindow.webContents.send('rebalance-completed', lastRebalanceResult);
+    }
+
+    // 如果執行了換倉，發送 Telegram 通知
+    if (result.rebalanceExecuted) {
+      const txUrl = result.digest 
+        ? `https://suiscan.xyz/mainnet/tx/${result.digest}`
+        : null;
+      
+      const tgMessage = `
+<b>🔄 MMT 自動換倉完成</b>
+
+✅ <b>狀態:</b> ${result.success ? '成功' : '失敗'}
+📊 <b>Pool ID:</b> <code>${result.poolId}</code>
+${result.tickRange ? `📈 <b>新價格範圍:</b> ${parseFloat(result.tickRange.lowerPrice).toFixed(6)} - ${parseFloat(result.tickRange.upperPrice).toFixed(6)}` : ''}
+${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
+
+<i>自動換倉已於 ${new Date().toLocaleString('zh-TW')} 執行</i>
+`;
+
+      telegramNotifier.sendMessage(tgMessage).catch(err => {
+        console.error('❌ Telegram notification failed:', err.message);
+      });
+
+      console.log(`✅ Rebalance executed successfully: ${result.digest || 'N/A'}`);
+    } else if (result.rebalanceNeeded === false) {
+      console.log('✅ No rebalance needed - positions are in range');
+    } else if (result.error) {
+      console.error(`❌ Rebalance error: ${result.error}`);
+      
+      // 發送錯誤通知
+      const tgMessage = `
+<b>❌ MMT 自動換倉失敗</b>
+
+🚫 <b>錯誤:</b> ${result.error}
+📊 <b>Pool ID:</b> <code>${result.poolId}</code>
+
+<i>請檢查錢包餘額和私鑰設定</i>
+`;
+
+      telegramNotifier.sendMessage(tgMessage).catch(err => {
+        console.error('❌ Telegram notification failed:', err.message);
+      });
+    }
+
+    return result;
+
+  } catch (error) {
+    console.error('❌ Rebalance check failed:', error.message);
+    
+    lastRebalanceResult = {
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (mainWindow) {
+      mainWindow.webContents.send('rebalance-completed', lastRebalanceResult);
+    }
+
+    return lastRebalanceResult;
+  }
 }
 
 process.on("unhandledRejection", (reason, p) => {
@@ -530,6 +663,18 @@ app.whenReady().then(async () => {
   console.log(
     `⏱️  Scheduled auto-update every ${UPDATE_INTERVAL_MS / 60000} minutes`
   );
+
+  // Schedule periodic rebalance checks
+  rebalanceInterval = setInterval(runRebalanceCheck, REBALANCE_INTERVAL_MS);
+  console.log(
+    `🔄 Scheduled auto-rebalance check every ${REBALANCE_INTERVAL_MS / 60000} minutes`
+  );
+
+  // Run initial rebalance check (after a short delay to let UI load)
+  setTimeout(() => {
+    console.log('🔄 Running initial rebalance check...');
+    runRebalanceCheck();
+  }, 5000);
 });
 
 app.on("window-all-closed", () => {

@@ -37,9 +37,20 @@ const CONFIG = {
 };
 
 // ============ Logging ============
+// 支援外部注入 logger（供 main.js 使用）
+let externalLogger = null;
+
+function setLogger(logger) {
+  externalLogger = logger;
+}
+
 function log(message, level = 'INFO') {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [${level}] ${message}`);
+  const formattedMessage = `[${timestamp}] [${level}] ${message}`;
+  console.log(formattedMessage);
+  if (externalLogger) {
+    externalLogger(formattedMessage, level);
+  }
 }
 
 function logError(message) {
@@ -544,6 +555,134 @@ if (require.main === module) {
   main();
 }
 
+// ============ Auto Rebalance Function (for main.js) ============
+/**
+ * 執行自動換倉檢查
+ * @param {Object} options - 選項
+ * @param {boolean} options.dryRun - 是否模擬執行
+ * @param {boolean} options.force - 是否強制執行
+ * @param {number} options.rangePercent - 價格範圍百分比
+ * @returns {Promise<Object>} 執行結果
+ */
+async function runAutoRebalance(options = {}) {
+  const opts = {
+    dryRun: options.dryRun ?? false,
+    force: options.force ?? false,
+    rangePercent: options.rangePercent ?? CONFIG.defaultRangePercent,
+  };
+  
+  log('========================================');
+  log('MMT Auto Rebalance Check');
+  log('========================================');
+  log(`Mode: ${opts.dryRun ? 'DRY RUN' : 'EXECUTE'}`);
+  log(`Force: ${opts.force ? 'YES' : 'NO'}`);
+  log(`Range: ±${(opts.rangePercent * 100).toFixed(4)}%`);
+  log(`Pool ID: ${CONFIG.poolId}`);
+  log('');
+  
+  try {
+    // 1. 初始化
+    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    log(`Wallet address: ${address}`);
+    
+    // 2. 獲取 Pool 資料
+    const pool = await fetchPoolData(mmtSdk, CONFIG.poolId);
+    
+    // 3. 查找現有倉位
+    const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId, pool);
+    
+    // 4. 檢查倉位是否已離開價格區間
+    if (existingPositions.length === 0) {
+      log('⚠️  No existing positions found in this pool.');
+      return {
+        success: true,
+        rebalanceNeeded: false,
+        rebalanceExecuted: false,
+        message: 'No positions found',
+        poolId: CONFIG.poolId,
+      };
+    }
+    
+    // 檢查所有倉位是否都在範圍內
+    let anyOutOfRange = false;
+    for (const pos of existingPositions) {
+      if (checkPositionOutOfRange(pos, pool)) {
+        anyOutOfRange = true;
+      }
+    }
+    
+    if (!anyOutOfRange && !opts.force) {
+      log('');
+      log('========================================');
+      logSuccess('All positions are still IN RANGE');
+      log('No rebalance needed.');
+      log('========================================');
+      
+      return {
+        success: true,
+        rebalanceNeeded: false,
+        rebalanceExecuted: false,
+        message: 'All positions are in range',
+        poolId: CONFIG.poolId,
+      };
+    }
+    
+    if (opts.force && !anyOutOfRange) {
+      log('⚠️  Positions are in range, but force flag is set. Proceeding with rebalance...');
+    }
+    
+    // 5. 計算新的 tick 範圍
+    const tickRange = calculateTickRange(pool, opts.rangePercent);
+    
+    // 6. 建構交易
+    const txb = await buildRebalanceTransaction(
+      mmtSdk,
+      suiClient,
+      address,
+      pool,
+      tickRange,
+      existingPositions
+    );
+    
+    // 7. 執行交易
+    const result = await executeTransaction(suiClient, keypair, txb, opts.dryRun);
+    
+    // 8. 輸出結果
+    log('');
+    log('========================================');
+    if (result.success) {
+      logSuccess('Rebalance completed successfully!');
+      if (result.digest) {
+        log(`Transaction: https://suiscan.xyz/mainnet/tx/${result.digest}`);
+      }
+    } else {
+      logError('Rebalance failed');
+    }
+    log('========================================');
+    
+    return {
+      success: result.success,
+      dryRun: opts.dryRun,
+      rebalanceNeeded: true,
+      rebalanceExecuted: result.success,
+      digest: result.digest || null,
+      tickRange,
+      poolId: CONFIG.poolId,
+      error: result.error || null,
+    };
+    
+  } catch (error) {
+    logError(`Fatal error: ${error.message}`);
+    return {
+      success: false,
+      rebalanceNeeded: null,
+      rebalanceExecuted: false,
+      error: error.message,
+      poolId: CONFIG.poolId,
+    };
+  }
+}
+
 // 導出供其他模組使用
 module.exports = {
   initializeSDK,
@@ -553,4 +692,7 @@ module.exports = {
   checkPositionOutOfRange,
   buildRebalanceTransaction,
   executeTransaction,
+  runAutoRebalance,
+  setLogger,
+  CONFIG,
 };

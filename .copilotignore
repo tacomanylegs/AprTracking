@@ -2,6 +2,7 @@
 .env
 .env.*
 *.env
+desktop-widget/.env
 
 # 服務帳戶金鑰
 service-account.json

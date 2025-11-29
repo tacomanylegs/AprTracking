@@ -4,3 +4,4 @@ node_modules/
 **.json
 desktop-widget/history/apr-history.json
 desktop-widget/.env
+desktop-widget/.env
