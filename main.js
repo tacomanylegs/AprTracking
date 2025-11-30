@@ -124,7 +124,7 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     { label: "Open History", click: () => mainWindow.show() },
-    { label: "Refresh Now", click: () => fetchAndDisplayData() },
+    { label: "Refresh Now", click: () => runUnifiedUpdateCycle() },
     { type: "separator" },
     { 
       label: "Auto Rebalance", 
@@ -188,8 +188,49 @@ ipcMain.on("icon-generated", (event, dataUrl) => {
 });
 
 ipcMain.on("refresh-request", () => {
-  fetchAndDisplayData();
+  // 使用統一的更新循環
+  runUnifiedUpdateCycle();
 });
+
+/**
+ * 統一的定期更新和換倉檢查函數
+ * 並行執行 fetchAndDisplayData 和 runRebalanceCheck，然後合併結果並保存到 Google Sheets
+ */
+async function runUnifiedUpdateCycle() {
+  console.log('🔄 Starting unified update cycle (APR + Rebalance)...');
+
+  // 並行執行兩個函數，使用 allSettled 確保互不影響
+  const [aprResult, rebalanceResult] = await Promise.allSettled([
+    fetchAndDisplayData(),
+    runRebalanceCheck()
+  ]);
+
+  const aprData = aprResult.status === 'fulfilled' ? aprResult.value : null;
+  const rebalanceData = rebalanceResult.status === 'fulfilled' ? rebalanceResult.value : null;
+
+  // 記錄結果
+  console.log('📊 Unified cycle results:');
+  console.log(`   APR fetch: ${aprData ? '✅ Success' : '❌ Failed'}`);
+  console.log(`   Rebalance check: ${rebalanceData ? '✅ Success' : '❌ Failed'}`);
+
+  // 保存到本地文件
+  if (aprData) {
+    saveHistoryToLocal(aprData);
+  }
+
+  // 保存到 Google Sheets（合併 APR 和再平衡數據）
+  if (aprData || rebalanceData) {
+    const historyData = {
+      aprResults: aprData ? aprData.data : null,
+      rebalanceResults: rebalanceData ? rebalanceData.resultsByPool : {},
+      timestamp: aprData?.timestamp || new Date().toISOString()
+    };
+
+    sheetsManager.appendHistoryWithRebalance(historyData).catch((e) => {
+      console.warn("Failed to save to Google Sheets:", e.message);
+    });
+  }
+}
 
 ipcMain.on("maximize-window", (event) => {
   if (mainWindow) {
@@ -204,6 +245,10 @@ ipcMain.on("restore-window", (event) => {
   }
 });
 
+/**
+ * 獲取 APR 數據（不直接保存，由統一計時器處理）
+ * @returns {Promise<Object>} { timestamp, data: [...] } or null
+ */
 async function fetchAndDisplayData() {
   console.log("Fetching APR data...");
   if (tray) tray.setToolTip("Updating...");
@@ -291,21 +336,30 @@ async function fetchAndDisplayData() {
     updateTrayIcon(iconText);
     tray.setToolTip(`Best: ${bestAprStr} (${best ? best.name : ""})`);
 
-    // Save History
-    saveHistory(results);
-
     // Notify renderer to update chart if open
     mainWindow.webContents.send("data-updated", readHistory());
+
+    // 返回 APR 數據（不直接保存，由統一計時器處理）
+    return {
+      timestamp: new Date().toISOString(),
+      data: results
+    };
+
   } catch (error) {
     console.error("Error fetching data:", error);
     if (tray) tray.setToolTip("Error fetching data");
+    return null;
   }
 }
 
-function saveHistory(data) {
-  const now = new Date().toISOString();
-  // Remove URL fields before saving
-  const cleanData = data.map(({ url, ...rest }) => rest);
+/**
+ * 保存 APR 歷史記錄（合併 APR 和再平衡數據）
+ */
+function saveHistoryToLocal(aprData) {
+  if (!aprData) return;
+
+  const now = aprData.timestamp || new Date().toISOString();
+  const cleanData = aprData.data.map(({ url, ...rest }) => rest);
   const entry = { timestamp: now, data: cleanData };
 
   let history = [];
@@ -321,11 +375,6 @@ function saveHistory(data) {
   if (history.length > 3000) history = history.slice(-3000);
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-
-  // Also save to Google Sheets
-  sheetsManager.appendHistory([entry]).catch((e) => {
-    console.warn("Failed to save to Google Sheets:", e.message);
-  });
 }
 
 function readHistory() {
@@ -498,11 +547,12 @@ function showPriceAlert(currentPrice, range) {
 
 /**
  * 執行自動換倉檢查（支持多個 Pool）
+ * @returns {Promise<Object>} 再平衡結果（由統一計時器處理保存）
  */
 async function runRebalanceCheck() {
   if (!autoRebalanceEnabled) {
     console.log('⏸️  Auto rebalance is disabled, skipping...');
-    return;
+    return { resultsByPool: {} };
   }
 
   console.log('🔄 Running auto rebalance check for all enabled pools...');
@@ -541,7 +591,7 @@ async function runRebalanceCheck() {
       force: false,
     });
 
-    // 為每個 Pool 結果添加 Pool 名稱和時間戳
+    // 為每個 Pool 結果添加 Pool 名稱、符號和時間戳（包括無需操作的 Pool）
     const enrichedResults = {};
     enabledPools.forEach(pool => {
       const result = multiPoolResult.resultsByPool[pool.id];
@@ -613,6 +663,7 @@ ${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
       }
     }
 
+    // 返回再平衡結果（由統一計時器處理保存）
     return {
       success: true,
       resultsByPool: enrichedResults,
@@ -731,7 +782,8 @@ app.whenReady().then(async () => {
     } else {
       console.log("⏰ Data expired, fetching new data...");
     }
-    fetchAndDisplayData();
+    // 使用統一的更新循環代替直接調用 fetchAndDisplayData
+    runUnifiedUpdateCycle();
   } else {
     console.log(
       `✅ Data still valid (${Math.round(timeSinceLastUpdate / 1000)}s ago)`
@@ -758,22 +810,16 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Schedule periodic updates
-  updateInterval = setInterval(fetchAndDisplayData, UPDATE_INTERVAL_MS);
+  // Schedule periodic unified updates (APR + Rebalance in parallel)
+  updateInterval = setInterval(runUnifiedUpdateCycle, UPDATE_INTERVAL_MS);
   console.log(
-    `⏱️  Scheduled auto-update every ${UPDATE_INTERVAL_MS / 60000} minutes`
+    `⏱️  Scheduled unified update cycle every ${UPDATE_INTERVAL_MS / 60000} minutes (APR + Rebalance)`
   );
 
-  // Schedule periodic rebalance checks
-  rebalanceInterval = setInterval(runRebalanceCheck, REBALANCE_INTERVAL_MS);
-  console.log(
-    `🔄 Scheduled auto-rebalance check every ${REBALANCE_INTERVAL_MS / 60000} minutes`
-  );
-
-  // Run initial rebalance check (after a short delay to let UI load)
+  // Run initial cycle (after a short delay to let UI load)
   setTimeout(() => {
-    console.log('🔄 Running initial rebalance check...');
-    runRebalanceCheck();
+    console.log('🔄 Running initial unified update cycle...');
+    runUnifiedUpdateCycle();
   }, 5000);
 });
 

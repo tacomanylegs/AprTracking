@@ -305,8 +305,153 @@ function parseTimestamp(timestampStr) {
     }
 }
 
+/**
+ * Append history entries with rebalance status to Google Sheet
+ * 同時寫入 APR 數據 (A-D 欄) 和再平衡狀態 (E 欄)
+ * 
+ * @param {Object} historyData - { aprResults: [...], rebalanceResults: {...}, timestamp: "..." }
+ * @returns {Promise<boolean>}
+ */
+async function appendHistoryWithRebalance(historyData) {
+    try {
+        const auth = await getAuthClient();
+        if (!auth) {
+            console.warn('⚠️  Google Sheets Service Account not configured, skipping upload');
+            return false;
+        }
+
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        const { aprResults, rebalanceResults, timestamp } = historyData;
+
+        // 格式化時間戳
+        const formattedTimestamp = new Date(timestamp).toLocaleString('zh-TW', { 
+            timeZone: 'Asia/Taipei',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // 建立行數據，結合 APR 和再平衡狀態
+        const rows = [];
+
+        // 如果沒有 APR 結果但有再平衡結果，只寫再平衡狀態
+        if (!aprResults || aprResults.length === 0) {
+            if (rebalanceResults && Object.keys(rebalanceResults).length > 0) {
+                for (const poolId in rebalanceResults) {
+                    const result = rebalanceResults[poolId];
+                    const rebalanceStatus = formatRebalanceStatus(result);
+                    rows.push([
+                        formattedTimestamp,
+                        result.poolName || 'Unknown',
+                        '',  // APR
+                        result.poolUsdcPrice || '',  // USDC Price
+                        rebalanceStatus  // E 欄：再平衡狀態
+                    ]);
+                }
+            }
+        } else {
+            // 正常情況：有 APR 結果
+            aprResults.forEach(item => {
+                // 查找該 Pool 對應的再平衡結果
+                let rebalanceStatus = '';
+                let poolId = null;
+
+                // 嘗試從 rebalanceResults 中找到對應的 Pool
+                if (rebalanceResults) {
+                    for (const id in rebalanceResults) {
+                        if (rebalanceResults[id].poolName === item.name) {
+                            rebalanceStatus = formatRebalanceStatus(rebalanceResults[id]);
+                            poolId = id;
+                            break;
+                        }
+                    }
+                }
+
+                rows.push([
+                    formattedTimestamp,
+                    item.name,
+                    item.apr ? item.apr.toFixed(2) : 'N/A',
+                    item.usdcPrice ? item.usdcPrice.toString() : '',
+                    rebalanceStatus  // E 欄：再平衡狀態
+                ]);
+            });
+
+            // 如果有只在再平衡結果中出現的 Pool（APR 失敗但再平衡成功）
+            if (rebalanceResults) {
+                for (const poolId in rebalanceResults) {
+                    const result = rebalanceResults[poolId];
+                    const aprFound = aprResults.some(item => item.name === result.poolName);
+                    if (!aprFound) {
+                        const rebalanceStatus = formatRebalanceStatus(result);
+                        rows.push([
+                            formattedTimestamp,
+                            result.poolName || 'Unknown',
+                            '',  // APR 缺失
+                            result.poolUsdcPrice || '',  // USDC Price
+                            rebalanceStatus  // E 欄：再平衡狀態
+                        ]);
+                    }
+                }
+            }
+        }
+
+        if (rows.length === 0) {
+            console.log('⚠️  No rows to append');
+            return true;
+        }
+
+        // Append to sheet (starting from row 2, A1 is reserved for buy price)
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!A2:E`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values: rows
+            }
+        });
+
+        console.log(`✅ Uploaded ${rows.length} rows to Google Sheets (with rebalance status)`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Failed to upload to Google Sheets:', error.message);
+        return false;
+    }
+}
+
+/**
+ * 格式化再平衡狀態為顯示字符串
+ */
+function formatRebalanceStatus(result) {
+    if (!result) return '';
+
+    if (result.error) {
+        return `❌ 失敗 (${result.error.substring(0, 20)})`;
+    }
+
+    if (result.rebalanceExecuted && result.success) {
+        const digestShort = result.digest ? result.digest.substring(0, 10) : 'N/A';
+        return `✅ 成功 (${digestShort}...)`;
+    }
+
+    if (result.rebalanceNeeded === false) {
+        return '⏸ 無需操作';
+    }
+
+    if (result.rebalanceNeeded === true && !result.rebalanceExecuted) {
+        return '⏳ 待執行';
+    }
+
+    return '❓ 未知';
+}
+
 module.exports = {
     appendHistory,
+    appendHistoryWithRebalance,
     getLastTimestamp,
     getAuthClient,
     fetchAllHistory,
