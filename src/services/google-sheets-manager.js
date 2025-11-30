@@ -5,7 +5,9 @@ const path = require('path');
 // Google Sheets API configuration
 const SPREADSHEET_ID = '1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0';
 const SHEET_NAME = 'APR';
-const SERVICE_ACCOUNT_FILE = path.join(__dirname, 'service-account.json');
+const envLoader = require('../utils/env-loader');
+envLoader.load();
+const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_SERVICE_ACCOUNT_FILE || 'service-account.json');
 
 let authClient = null;
 
