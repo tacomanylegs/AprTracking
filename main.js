@@ -90,7 +90,7 @@ const telegramNotifier = new TelegramNotifier();
 
 // Configuration
 const WINDOW_WIDTH = 350;
-const WINDOW_HEIGHT = 645;
+const WINDOW_HEIGHT = 810;
 const UPDATE_INTERVAL_MS = poolsConfig.updateInterval || 30 * 60 * 1000; // 30 minutes
 const REBALANCE_INTERVAL_MS = poolsConfig.rebalanceInterval || 30 * 60 * 1000; // 30 minutes
 const HISTORY_FILE = path.join(__dirname, "history", "apr-history.json");
@@ -263,6 +263,12 @@ async function runUnifiedUpdateCycle() {
       console.warn("Failed to save to Google Sheets:", e.message);
     });
   }
+
+  // 更新 UI 顯示最新歷史記錄（在保存後）
+  if (mainWindow && aprData) {
+    const updatedHistory = readHistory();
+    mainWindow.webContents.send("data-updated", updatedHistory);
+  }
 }
 
 ipcMain.on("maximize-window", (event) => {
@@ -385,9 +391,6 @@ async function fetchAndDisplayData() {
     // Update Tray
     updateTrayIcon(iconText);
     tray.setToolTip(`Best: ${bestAprStr} (${best ? best.name : ""})`);
-
-    // Notify renderer to update chart if open
-    mainWindow.webContents.send("data-updated", readHistory());
 
     // 返回 APR 數據（不直接保存，由統一計時器處理）
     return {
