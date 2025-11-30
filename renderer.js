@@ -221,12 +221,8 @@ window.openExternal = (url) => {
 };
 
 // --- Rebalance Status Management ---
-let rebalanceState = {
-    enabled: false,
-    lastResult: null,
-    lastCheckTime: null,
-    isProcessing: false
-};
+let rebalanceStateByPool = {}; // { poolId: { enabled, lastResult, lastCheckTime, isProcessing } }
+let rebalanceGlobalEnabled = false; // Global toggle for auto-rebalance
 
 const rebalanceToggleBtn = document.getElementById('rebalanceToggle');
 const manualRebalanceBtn = document.getElementById('manualRebalanceBtn');
@@ -244,41 +240,62 @@ const closeHistoryBtn = document.getElementById('closeHistoryBtn');
 
 // Store all rebalance results for scrolling history
 let rebalanceResults = [];
-let lastDisplayedDigest = null; // Track last displayed digest to avoid duplicates
+let lastDisplayedDigests = new Set(); // Track last displayed digests to avoid duplicates
 
-// Toggle rebalance on/off
+// Toggle rebalance on/off (global)
 rebalanceToggleBtn.addEventListener('click', async () => {
-    const newState = !rebalanceState.enabled;
+    const newState = !rebalanceGlobalEnabled;
     const result = await ipcRenderer.invoke('set-rebalance-enabled', newState);
-    rebalanceState.enabled = result;
+    rebalanceGlobalEnabled = result;
     updateRebalanceUI();
 });
 
 // Manual rebalance trigger
 manualRebalanceBtn.addEventListener('click', async () => {
-    if (rebalanceState.isProcessing) {
+    if (Object.values(rebalanceStateByPool).some(s => s.isProcessing)) {
         alert('換倉正在進行中，請稍候...');
         return;
     }
     
     manualRebalanceBtn.disabled = true;
-    rebalanceState.isProcessing = true;
+    
+    // Mark all pools as processing
+    for (const poolId in rebalanceStateByPool) {
+        rebalanceStateByPool[poolId].isProcessing = true;
+    }
     updateRebalanceUI();
     
     try {
         const result = await ipcRenderer.invoke('trigger-rebalance');
-        rebalanceState.lastResult = result;
-        rebalanceState.lastCheckTime = new Date();
+        if (result.resultsByPool) {
+            // Update each pool's state with results
+            for (const poolId in result.resultsByPool) {
+                if (!rebalanceStateByPool[poolId]) {
+                    rebalanceStateByPool[poolId] = {
+                        enabled: true,
+                        lastResult: null,
+                        lastCheckTime: null,
+                        isProcessing: false
+                    };
+                }
+                rebalanceStateByPool[poolId].lastResult = result.resultsByPool[poolId];
+                rebalanceStateByPool[poolId].lastCheckTime = new Date();
+                rebalanceStateByPool[poolId].isProcessing = false;
+            }
+        }
         updateRebalanceUI();
     } catch (error) {
         console.error('❌ Manual rebalance failed:', error);
-        rebalanceState.lastResult = {
-            success: false,
-            error: error.message
-        };
+        for (const poolId in rebalanceStateByPool) {
+            rebalanceStateByPool[poolId].lastResult = {
+                success: false,
+                error: error.message,
+                poolId: poolId
+            };
+            rebalanceStateByPool[poolId].isProcessing = false;
+        }
         updateRebalanceUI();
     } finally {
-        rebalanceState.isProcessing = false;
         manualRebalanceBtn.disabled = false;
         updateRebalanceUI();
     }
@@ -314,6 +331,7 @@ function displayRebalanceHistory() {
     
     rebalanceHistoryList.innerHTML = rebalanceResults.map((result, index) => `
         <div class="history-item ${result.resultClass}">
+            <div class="history-item-pool">${result.poolName || 'Unknown'}</div>
             <a href="#" onclick="window.openExternal('${result.txUrl}'); return false;" class="history-item-link">${result.digest}</a>
             <span class="history-item-time">${result.timeStr}</span>
         </div>
@@ -322,27 +340,42 @@ function displayRebalanceHistory() {
 
 // Listen for rebalance status changes from main process
 ipcRenderer.on('rebalance-status-changed', (event, status) => {
-    rebalanceState.enabled = status.enabled;
+    rebalanceGlobalEnabled = status.enabled;
     updateRebalanceUI();
 });
 
 // Listen for rebalance started
 ipcRenderer.on('rebalance-started', () => {
-    rebalanceState.isProcessing = true;
+    for (const poolId in rebalanceStateByPool) {
+        rebalanceStateByPool[poolId].isProcessing = true;
+    }
     updateRebalanceUI();
 });
 
 // Listen for rebalance completed
 ipcRenderer.on('rebalance-completed', (event, result) => {
-    rebalanceState.lastResult = result;
-    rebalanceState.lastCheckTime = new Date();
-    rebalanceState.isProcessing = false;
+    if (result.resultsByPool) {
+        // Update each pool's state with results
+        for (const poolId in result.resultsByPool) {
+            if (!rebalanceStateByPool[poolId]) {
+                rebalanceStateByPool[poolId] = {
+                    enabled: true,
+                    lastResult: null,
+                    lastCheckTime: null,
+                    isProcessing: false
+                };
+            }
+            rebalanceStateByPool[poolId].lastResult = result.resultsByPool[poolId];
+            rebalanceStateByPool[poolId].lastCheckTime = new Date();
+            rebalanceStateByPool[poolId].isProcessing = false;
+        }
+    }
     updateRebalanceUI();
 });
 
 function updateRebalanceUI() {
     // Update toggle button state
-    if (rebalanceState.enabled) {
+    if (rebalanceGlobalEnabled) {
         rebalanceToggleBtn.textContent = '✓ 已啟用';
         rebalanceToggleBtn.classList.remove('disabled');
     } else {
@@ -350,85 +383,109 @@ function updateRebalanceUI() {
         rebalanceToggleBtn.classList.add('disabled');
     }
     
-    // Update status display
+    // Check if any pool is processing
+    const anyProcessing = Object.values(rebalanceStateByPool).some(s => s.isProcessing);
+    
+    // Update status display (show aggregate status of all pools)
     rebalanceStatusDiv.classList.remove('active', 'error', 'processing');
     
-    if (rebalanceState.isProcessing) {
+    if (anyProcessing) {
         rebalanceStatusDiv.classList.add('processing');
         rebalanceStatusText.textContent = '⏳ 進行中...';
-    } else if (rebalanceState.lastResult) {
-        if (rebalanceState.lastResult.success) {
-            rebalanceStatusDiv.classList.add('active');
-            if (rebalanceState.lastResult.rebalanceExecuted) {
-                rebalanceStatusText.textContent = '✅ 換倉成功';
-            } else if (rebalanceState.lastResult.rebalanceNeeded === false) {
-                rebalanceStatusText.textContent = '✓ 無需換倉';
-            } else {
-                rebalanceStatusText.textContent = '✓ 檢查完成';
-            }
-        } else {
-            rebalanceStatusDiv.classList.add('error');
-            rebalanceStatusText.textContent = `❌ 失敗: ${rebalanceState.lastResult.error || '未知錯誤'}`;
-        }
     } else {
-        rebalanceStatusText.textContent = rebalanceState.enabled ? '✓ 已啟用' : '✗ 已禁用';
+        // Calculate aggregate status
+        const results = Object.values(rebalanceStateByPool)
+            .filter(s => s.lastResult)
+            .map(s => s.lastResult);
+        
+        if (results.length === 0) {
+            rebalanceStatusText.textContent = rebalanceGlobalEnabled ? '✓ 已啟用' : '✗ 已禁用';
+        } else {
+            const allSuccess = results.every(r => r.success);
+            const anyExecuted = results.some(r => r.rebalanceExecuted);
+            
+            if (allSuccess) {
+                rebalanceStatusDiv.classList.add('active');
+                if (anyExecuted) {
+                    rebalanceStatusText.textContent = `✅ 換倉成功 (${results.length} 個 Pool)`;
+                } else {
+                    rebalanceStatusText.textContent = `✓ 無需換倉 (${results.length} 個 Pool)`;
+                }
+            } else {
+                rebalanceStatusDiv.classList.add('error');
+                const failedCount = results.filter(r => !r.success).length;
+                rebalanceStatusText.textContent = `❌ ${failedCount}/${results.length} 失敗`;
+            }
+        }
     }
     
-    // Update last check time
-    if (rebalanceState.lastCheckTime) {
+    // Update last check time (latest among all pools)
+    const latestCheckTime = Object.values(rebalanceStateByPool)
+        .filter(s => s.lastCheckTime)
+        .map(s => new Date(s.lastCheckTime).getTime())
+        .sort((a, b) => b - a)[0];
+    
+    if (latestCheckTime) {
         rebalanceLastCheckDiv.style.display = 'flex';
-        const timeStr = rebalanceState.lastCheckTime instanceof Date 
-            ? rebalanceState.lastCheckTime.toLocaleTimeString() 
-            : new Date(rebalanceState.lastCheckTime).toLocaleTimeString();
+        const timeStr = new Date(latestCheckTime).toLocaleTimeString();
         rebalanceLastCheckTime.textContent = timeStr;
     } else {
         rebalanceLastCheckDiv.style.display = 'none';
     }
     
-    // Update result details
-    if (rebalanceState.lastResult && rebalanceState.lastResult.digest) {
-        const resultClass = rebalanceState.lastResult.success ? 'success' : 'error';
-        const digest = rebalanceState.lastResult.digest;
-        const digestShort = digest.substring(0, 12);
-        const txUrl = `https://suiscan.xyz/mainnet/tx/${digest}`;
+    // Render all pool results
+    if (Object.values(rebalanceStateByPool).some(s => s.lastResult)) {
+        let resultsHTML = '';
         
-        // Format timestamp safely
-        let timeStr = '未知';
-        if (rebalanceState.lastResult.timestamp) {
-            const date = new Date(rebalanceState.lastResult.timestamp);
-            if (!isNaN(date.getTime())) {
-                timeStr = date.toLocaleTimeString('zh-TW');
-            }
-        }
-        
-        // Only add to results list if it's a new digest
-        if (digest !== lastDisplayedDigest) {
-            rebalanceResults.unshift({
-                digest: digestShort,
-                txUrl: txUrl,
-                timeStr: timeStr,
-                resultClass: resultClass
-            });
+        Object.entries(rebalanceStateByPool).forEach(([poolId, state]) => {
+            if (!state.lastResult) return;
             
-            // Keep last 10 for history
-            if (rebalanceResults.length > 10) {
-                rebalanceResults.pop();
+            const result = state.lastResult;
+            const resultClass = result.success ? 'success' : 'error';
+            
+            let poolLabel = result.poolName || 'Unknown Pool';
+            let statusText = '✓ 無需換倉';
+            let txHtml = '';
+            
+            if (result.rebalanceExecuted && result.digest) {
+                statusText = '✅ 換倉成功';
+                const digestShort = result.digest.substring(0, 12);
+                const txUrl = `https://suiscan.xyz/mainnet/tx/${result.digest}`;
+                txHtml = `<a href="#" onclick="window.openExternal('${txUrl}'); return false;" class="rebalance-result-tx">${digestShort}</a>`;
+                
+                // Add to history if new
+                if (!lastDisplayedDigests.has(result.digest)) {
+                    const timeStr = result.timestamp 
+                        ? new Date(result.timestamp).toLocaleTimeString('zh-TW')
+                        : '未知';
+                    rebalanceResults.unshift({
+                        digest: digestShort,
+                        poolName: poolLabel,
+                        txUrl: txUrl,
+                        timeStr: timeStr,
+                        resultClass: resultClass
+                    });
+                    lastDisplayedDigests.add(result.digest);
+                    
+                    if (rebalanceResults.length > 20) {
+                        rebalanceResults.pop();
+                    }
+                }
+            } else if (result.error) {
+                statusText = `❌ 失敗: ${result.error}`;
             }
             
-            lastDisplayedDigest = digest;
-        }
+            resultsHTML += `
+                <div class="rebalance-result-item ${resultClass}">
+                    <div class="rebalance-pool-label">${poolLabel}</div>
+                    <div class="rebalance-result-status">${statusText}</div>
+                    ${txHtml ? `<div>${txHtml}</div>` : ''}
+                </div>
+            `;
+        });
         
-        // Render results list (only show the latest one)
-        rebalanceResultsList.innerHTML = `
-            <div class="rebalance-result ${rebalanceResults[0].resultClass}">
-                <a href="#" onclick="window.openExternal('${rebalanceResults[0].txUrl}'); return false;" class="rebalance-result-tx">${rebalanceResults[0].digest}</a>
-                <span class="rebalance-result-time">${rebalanceResults[0].timeStr}</span>
-            </div>
-        `;
-        
+        rebalanceResultsList.innerHTML = resultsHTML;
         rebalanceResultsContainer.style.display = 'block';
-    } else if (rebalanceState.lastResult && rebalanceState.lastResult.error) {
-        rebalanceResultsContainer.style.display = 'none';
     } else {
         rebalanceResultsContainer.style.display = 'none';
     }
@@ -436,11 +493,22 @@ function updateRebalanceUI() {
 
 // Load initial rebalance status
 ipcRenderer.invoke('get-rebalance-status').then(status => {
-    rebalanceState.enabled = status.enabled;
-    rebalanceState.lastResult = status.lastResult;
-    if (status.lastResult && status.lastResult.timestamp) {
-        rebalanceState.lastCheckTime = new Date(status.lastResult.timestamp);
+    rebalanceGlobalEnabled = status.enabled;
+    
+    // Initialize per-pool states
+    if (status.lastResultsByPool) {
+        for (const poolId in status.lastResultsByPool) {
+            rebalanceStateByPool[poolId] = {
+                enabled: true,
+                lastResult: status.lastResultsByPool[poolId],
+                lastCheckTime: status.lastResultsByPool[poolId].timestamp 
+                    ? new Date(status.lastResultsByPool[poolId].timestamp)
+                    : null,
+                isProcessing: false
+            };
+        }
     }
+    
     updateRebalanceUI();
 });
 

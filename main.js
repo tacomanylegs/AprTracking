@@ -15,6 +15,39 @@ require("./env-config");
 const envLoader = require("./src/utils/env-loader");
 envLoader.load();
 
+// ============ Load Pools Configuration ============
+const POOLS_CONFIG_FILE = path.join(__dirname, "pools.json");
+console.log(`📂 Looking for pools.json at: ${POOLS_CONFIG_FILE}`);
+
+let poolsConfig = {
+  pools: [
+    {
+      id: process.env.MMT_POOL_ID || '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
+      name: 'MMT 0.01%',
+      symbol: 'USDC-USDT',
+      enabled: true,
+      defaultRangePercent: 0.0001,
+    }
+  ],
+  updateInterval: 30 * 60 * 1000,
+  rebalanceInterval: 30 * 60 * 1000,
+};
+
+if (fs.existsSync(POOLS_CONFIG_FILE)) {
+  try {
+    const fileContent = fs.readFileSync(POOLS_CONFIG_FILE, "utf8");
+    poolsConfig = JSON.parse(fileContent);
+    console.log(`✅ Loaded pools.json with ${poolsConfig.pools.length} pool(s)`);
+    poolsConfig.pools.forEach((p, i) => {
+      console.log(`   [${i + 1}] ${p.name} (ID: ${p.id.substring(0, 10)}...) - Enabled: ${p.enabled}`);
+    });
+  } catch (e) {
+    console.warn("⚠️ Failed to parse pools.json, using default config:", e.message);
+  }
+} else {
+  console.warn(`⚠️ pools.json not found at ${POOLS_CONFIG_FILE}, using default config`);
+}
+
 // Import monitors
 const mmt001Monitor = require("./src/monitors/mmt-0.01-monitor");
 const mmt0001Monitor = require("./src/monitors/mmt-0.001-monitor");
@@ -22,7 +55,7 @@ const takaralendMonitor = require("./src/monitors/takaralend-monitor");
 const volosMonitor = require("./src/monitors/volos-monitor");
 const sheetsManager = require("./src/services/google-sheets-manager");
 const TelegramNotifier = require("./src/services/telegram-notifier");
-const rebalancer = require("./src/scripts/add-liquidity");
+const rebalancer = require("./src/scripts/rebalancer");
 
 let tray = null;
 let mainWindow = null;
@@ -32,14 +65,14 @@ let lastAlertedPrice = null; // Track last price that triggered alert
 let currentPriceRange = { min: 0.9, max: 1.1 }; // Current buy price range
 let isAlertState = false; // Current alert state for badge color
 let autoRebalanceEnabled = true; // 自動換倉開關
-let lastRebalanceResult = null; // 最近一次換倉結果
+let lastRebalanceResultsByPool = {}; // 各 Pool 最近的換倉結果
 const telegramNotifier = new TelegramNotifier();
 
 // Configuration
 const WINDOW_WIDTH = 350;
 const WINDOW_HEIGHT = 645;
-const UPDATE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
-const REBALANCE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const UPDATE_INTERVAL_MS = poolsConfig.updateInterval || 30 * 60 * 1000; // 30 minutes
+const REBALANCE_INTERVAL_MS = poolsConfig.rebalanceInterval || 30 * 60 * 1000; // 30 minutes
 const HISTORY_FILE = path.join(__dirname, "history", "apr-history.json");
 
 // Ensure history directory exists
@@ -187,15 +220,6 @@ async function fetchAndDisplayData() {
             mainWindow.webContents.send('initial-buy-price', currentPriceRange);
         }
     }
-
-    // // Parallel fetch
-    // const [takaraUsdt, takaraUsdc, volos] = await Promise.all([
-    //   takaralendMonitor.getAPR("USDT").catch((e) => null),
-    //   takaralendMonitor.getAPR("USDC").catch((e) => null),
-    //   volosMonitor
-    //     .queryVaults()
-    //     .catch((e) => ({ vault_1: null, vault_2: null })),
-    // ]);
 
     // Parallel fetch
     console.log("Starting parallel fetch for all pools...");
@@ -409,7 +433,7 @@ ipcMain.handle("get-alert-state", () => {
 ipcMain.handle("get-rebalance-status", () => {
   return { 
     enabled: autoRebalanceEnabled, 
-    lastResult: lastRebalanceResult,
+    lastResultsByPool: lastRebalanceResultsByPool,
     intervalMs: REBALANCE_INTERVAL_MS,
   };
 });
@@ -473,7 +497,7 @@ function showPriceAlert(currentPrice, range) {
 }
 
 /**
- * 執行自動換倉檢查
+ * 執行自動換倉檢查（支持多個 Pool）
  */
 async function runRebalanceCheck() {
   if (!autoRebalanceEnabled) {
@@ -481,7 +505,7 @@ async function runRebalanceCheck() {
     return;
   }
 
-  console.log('🔄 Running auto rebalance check...');
+  console.log('🔄 Running auto rebalance check for all enabled pools...');
   
   // 通知 UI 開始換倉檢查
   if (mainWindow) {
@@ -489,79 +513,129 @@ async function runRebalanceCheck() {
   }
 
   try {
-    const result = await rebalancer.runAutoRebalance({
+    // 獲取所有啟用的 Pool ID
+    const enabledPools = poolsConfig.pools.filter(p => p.enabled);
+    
+    if (enabledPools.length === 0) {
+      console.log('⚠️  No enabled pools found');
+      const result = {
+        success: true,
+        message: 'No enabled pools',
+        resultsByPool: {},
+        timestamp: new Date().toISOString(),
+      };
+      
+      if (mainWindow) {
+        mainWindow.webContents.send('rebalance-completed', result);
+      }
+      
+      return result;
+    }
+
+    const poolIds = enabledPools.map(p => p.id);
+    console.log(`📊 Processing ${enabledPools.length} pool(s): ${enabledPools.map(p => p.name).join(', ')}`);
+
+    // 並行執行多個 Pool 的換倉檢查
+    const multiPoolResult = await rebalancer.runAutoRebalanceForMultiplePools(poolIds, {
       dryRun: false,
       force: false,
     });
 
-    lastRebalanceResult = {
-      ...result,
-      timestamp: new Date().toISOString(),
-    };
+    // 為每個 Pool 結果添加 Pool 名稱和時間戳
+    const enrichedResults = {};
+    enabledPools.forEach(pool => {
+      const result = multiPoolResult.resultsByPool[pool.id];
+      if (result) {
+        enrichedResults[pool.id] = {
+          ...result,
+          poolName: pool.name,
+          poolSymbol: pool.symbol,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    });
+
+    lastRebalanceResultsByPool = enrichedResults;
 
     // 通知 UI 換倉結果
     if (mainWindow) {
-      mainWindow.webContents.send('rebalance-completed', lastRebalanceResult);
+      mainWindow.webContents.send('rebalance-completed', {
+        success: true,
+        resultsByPool: enrichedResults,
+        summary: multiPoolResult.summary,
+      });
     }
 
-    // 如果執行了換倉，發送 Telegram 通知
-    if (result.rebalanceExecuted) {
-      const txUrl = result.digest 
-        ? `https://suiscan.xyz/mainnet/tx/${result.digest}`
-        : null;
-      
-      const tgMessage = `
+    // 為每個執行的換倉發送 Telegram 通知
+    for (const poolId in enrichedResults) {
+      const result = enrichedResults[poolId];
+      const pool = enabledPools.find(p => p.id === poolId);
+
+      if (result.rebalanceExecuted) {
+        const txUrl = result.digest 
+          ? `https://suiscan.xyz/mainnet/tx/${result.digest}`
+          : null;
+        
+        const tgMessage = `
 <b>🔄 MMT 自動換倉完成</b>
 
+📍 <b>Pool:</b> ${result.poolName} (${result.poolSymbol})
 ✅ <b>狀態:</b> ${result.success ? '成功' : '失敗'}
-📊 <b>Pool ID:</b> <code>${result.poolId}</code>
 ${result.tickRange ? `📈 <b>新價格範圍:</b> ${parseFloat(result.tickRange.lowerPrice).toFixed(6)} - ${parseFloat(result.tickRange.upperPrice).toFixed(6)}` : ''}
 ${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
 
 <i>自動換倉已於 ${new Date().toLocaleString('zh-TW')} 執行</i>
 `;
 
-      telegramNotifier.sendMessage(tgMessage).catch(err => {
-        console.error('❌ Telegram notification failed:', err.message);
-      });
+        telegramNotifier.sendMessage(tgMessage).catch(err => {
+          console.error('❌ Telegram notification failed:', err.message);
+        });
 
-      console.log(`✅ Rebalance executed successfully: ${result.digest || 'N/A'}`);
-    } else if (result.rebalanceNeeded === false) {
-      console.log('✅ No rebalance needed - positions are in range');
-    } else if (result.error) {
-      console.error(`❌ Rebalance error: ${result.error}`);
-      
-      // 發送錯誤通知
-      const tgMessage = `
+        console.log(`✅ [${result.poolName}] Rebalance executed successfully: ${result.digest || 'N/A'}`);
+      } else if (result.rebalanceNeeded === false) {
+        console.log(`✅ [${result.poolName}] No rebalance needed - positions are in range`);
+      } else if (result.error) {
+        console.error(`❌ [${result.poolName}] Rebalance error: ${result.error}`);
+        
+        // 發送錯誤通知
+        const tgMessage = `
 <b>❌ MMT 自動換倉失敗</b>
 
+📍 <b>Pool:</b> ${result.poolName} (${result.poolSymbol})
 🚫 <b>錯誤:</b> ${result.error}
-📊 <b>Pool ID:</b> <code>${result.poolId}</code>
 
 <i>請檢查錢包餘額和私鑰設定</i>
 `;
 
-      telegramNotifier.sendMessage(tgMessage).catch(err => {
-        console.error('❌ Telegram notification failed:', err.message);
-      });
+        telegramNotifier.sendMessage(tgMessage).catch(err => {
+          console.error('❌ Telegram notification failed:', err.message);
+        });
+      }
     }
 
-    return result;
+    return {
+      success: true,
+      resultsByPool: enrichedResults,
+      summary: multiPoolResult.summary,
+    };
 
   } catch (error) {
     console.error('❌ Rebalance check failed:', error.message);
     
-    lastRebalanceResult = {
+    const result = {
       success: false,
       error: error.message,
+      resultsByPool: {},
       timestamp: new Date().toISOString(),
     };
 
+    lastRebalanceResultsByPool = {};
+
     if (mainWindow) {
-      mainWindow.webContents.send('rebalance-completed', lastRebalanceResult);
+      mainWindow.webContents.send('rebalance-completed', result);
     }
 
-    return lastRebalanceResult;
+    return result;
   }
 }
 

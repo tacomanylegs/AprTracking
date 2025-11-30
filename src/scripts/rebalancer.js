@@ -35,11 +35,9 @@ const Decimal = require('decimal.js');
 const CONFIG = {
   // 從 .env 讀取
   privateKey: process.env.SUI_PRIVATE_KEY,
-  poolId: process.env.MMT_POOL_ID || '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-  defaultRangePercent: parseFloat(process.env.DEFAULT_RANGE_PERCENT || '0.0001'),
-  
-  // Sui RPC
+  // poolId 可從環境變數或調用時傳入
   rpcUrl: 'https://fullnode.mainnet.sui.io',
+  defaultRangePercent: parseFloat(process.env.DEFAULT_RANGE_PERCENT || '0.0001'),
 };
 
 // ============ Logging ============
@@ -74,11 +72,17 @@ function parseArgs() {
     dryRun: args.includes('--dry-run'),
     force: args.includes('--force'),
     rangePercent: CONFIG.defaultRangePercent,
+    poolId: process.env.MMT_POOL_ID || '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
   };
   
   const rangeIdx = args.indexOf('--range');
   if (rangeIdx !== -1 && args[rangeIdx + 1]) {
     options.rangePercent = parseFloat(args[rangeIdx + 1]) / 100;
+  }
+  
+  const poolIdIdx = args.indexOf('--pool-id');
+  if (poolIdIdx !== -1 && args[poolIdIdx + 1]) {
+    options.poolId = args[poolIdIdx + 1];
   }
   
   // --env-path 已在 envLoader.load() 中處理，這裡只需過濾掉它
@@ -454,7 +458,7 @@ async function main() {
   log(`Mode: ${options.dryRun ? 'DRY RUN' : 'EXECUTE'}`);
   log(`Force: ${options.force ? 'YES' : 'NO'}`);
   log(`Range: ±${(options.rangePercent * 100).toFixed(4)}%`);
-  log(`Pool ID: ${CONFIG.poolId}`);
+  log(`Pool ID: ${options.poolId}`);
   log('');
   
   try {
@@ -463,10 +467,10 @@ async function main() {
     log(`Wallet address: ${address}`);
     
     // 2. 獲取 Pool 資料
-    const pool = await fetchPoolData(mmtSdk, CONFIG.poolId);
+    const pool = await fetchPoolData(mmtSdk, options.poolId);
     
     // 3. 查找現有倉位 (先檢查倉位狀態，傳入已獲取的 pool 避免重複請求)
-    const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId, pool);
+    const existingPositions = await findUserPositions(mmtSdk, address, options.poolId, pool);
     
     // 4. 檢查倉位是否已離開價格區間
     if (existingPositions.length === 0) {
@@ -493,7 +497,7 @@ async function main() {
           success: true,
           rebalanceNeeded: false,
           message: 'All positions are in range',
-          poolId: CONFIG.poolId,
+          poolId: options.poolId,
         }));
         
         process.exit(0);
@@ -541,7 +545,7 @@ async function main() {
       rebalanceNeeded: true,
       digest: result.digest || null,
       tickRange,
-      poolId: CONFIG.poolId,
+      poolId: options.poolId,
     }));
     
     process.exit(result.success ? 0 : 1);
@@ -566,14 +570,15 @@ if (require.main === module) {
 
 // ============ Auto Rebalance Function (for main.js) ============
 /**
- * 執行自動換倉檢查
+ * 執行自動換倉檢查（單一 Pool）
+ * @param {string} poolId - Pool 合約地址
  * @param {Object} options - 選項
  * @param {boolean} options.dryRun - 是否模擬執行
  * @param {boolean} options.force - 是否強制執行
  * @param {number} options.rangePercent - 價格範圍百分比
  * @returns {Promise<Object>} 執行結果
  */
-async function runAutoRebalance(options = {}) {
+async function runAutoRebalance(poolId, options = {}) {
   const opts = {
     dryRun: options.dryRun ?? false,
     force: options.force ?? false,
@@ -586,7 +591,7 @@ async function runAutoRebalance(options = {}) {
   log(`Mode: ${opts.dryRun ? 'DRY RUN' : 'EXECUTE'}`);
   log(`Force: ${opts.force ? 'YES' : 'NO'}`);
   log(`Range: ±${(opts.rangePercent * 100).toFixed(4)}%`);
-  log(`Pool ID: ${CONFIG.poolId}`);
+  log(`Pool ID: ${poolId}`);
   log('');
   
   try {
@@ -595,10 +600,10 @@ async function runAutoRebalance(options = {}) {
     log(`Wallet address: ${address}`);
     
     // 2. 獲取 Pool 資料
-    const pool = await fetchPoolData(mmtSdk, CONFIG.poolId);
+    const pool = await fetchPoolData(mmtSdk, poolId);
     
     // 3. 查找現有倉位
-    const existingPositions = await findUserPositions(mmtSdk, address, CONFIG.poolId, pool);
+    const existingPositions = await findUserPositions(mmtSdk, address, poolId, pool);
     
     // 4. 檢查倉位是否已離開價格區間
     if (existingPositions.length === 0) {
@@ -608,7 +613,7 @@ async function runAutoRebalance(options = {}) {
         rebalanceNeeded: false,
         rebalanceExecuted: false,
         message: 'No positions found',
-        poolId: CONFIG.poolId,
+        poolId: poolId,
       };
     }
     
@@ -632,7 +637,7 @@ async function runAutoRebalance(options = {}) {
         rebalanceNeeded: false,
         rebalanceExecuted: false,
         message: 'All positions are in range',
-        poolId: CONFIG.poolId,
+        poolId: poolId,
       };
     }
     
@@ -676,7 +681,7 @@ async function runAutoRebalance(options = {}) {
       rebalanceExecuted: result.success,
       digest: result.digest || null,
       tickRange,
-      poolId: CONFIG.poolId,
+      poolId: poolId,
       error: result.error || null,
     };
     
@@ -687,7 +692,83 @@ async function runAutoRebalance(options = {}) {
       rebalanceNeeded: null,
       rebalanceExecuted: false,
       error: error.message,
-      poolId: CONFIG.poolId,
+      poolId: poolId,
+    };
+  }
+}
+
+/**
+ * 並行執行多個 Pool 的自動換倉檢查
+ * @param {Array<string>} poolIds - Pool 合約地址陣列
+ * @param {Object} options - 選項
+ * @param {boolean} options.dryRun - 是否模擬執行
+ * @param {boolean} options.force - 是否強制執行
+ * @returns {Promise<Object>} { [poolId]: result } 結果字典
+ */
+async function runAutoRebalanceForMultiplePools(poolIds, options = {}) {
+  log('========================================');
+  log('Auto Rebalance Check for Multiple Pools');
+  log('========================================');
+  log(`Total Pools: ${poolIds.length}`);
+  log(`Mode: ${options.dryRun ? 'DRY RUN' : 'EXECUTE'}`);
+  log('');
+  
+  try {
+    // 使用 Promise.all 並行執行所有 Pool 的換倉檢查
+    // 確保各 Pool 互不影響（使用 catch 進行隔離）
+    const results = await Promise.all(
+      poolIds.map(poolId =>
+        runAutoRebalance(poolId, options).catch(error => ({
+          success: false,
+          rebalanceNeeded: null,
+          rebalanceExecuted: false,
+          error: error.message || 'Unknown error',
+          poolId: poolId,
+        }))
+      )
+    );
+    
+    // 將結果轉換為 { [poolId]: result } 格式
+    const resultsByPool = {};
+    results.forEach(result => {
+      resultsByPool[result.poolId] = result;
+    });
+    
+    // 統計摘要
+    const summary = {
+      totalPools: poolIds.length,
+      successCount: results.filter(r => r.success).length,
+      rebalanceExecutedCount: results.filter(r => r.rebalanceExecuted).length,
+      failureCount: results.filter(r => !r.success).length,
+    };
+    
+    log('');
+    log('========================================');
+    log('Multi-Pool Rebalance Summary');
+    log('========================================');
+    log(`✅ Success: ${summary.successCount}/${summary.totalPools}`);
+    log(`🔄 Executed: ${summary.rebalanceExecutedCount}`);
+    log(`❌ Failures: ${summary.failureCount}`);
+    log('========================================');
+    
+    return {
+      resultsByPool,
+      summary,
+      timestamp: new Date().toISOString(),
+    };
+    
+  } catch (error) {
+    logError(`Fatal error in multi-pool rebalance: ${error.message}`);
+    return {
+      resultsByPool: {},
+      summary: {
+        totalPools: poolIds.length,
+        successCount: 0,
+        rebalanceExecutedCount: 0,
+        failureCount: poolIds.length,
+      },
+      error: error.message,
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -702,6 +783,7 @@ module.exports = {
   buildRebalanceTransaction,
   executeTransaction,
   runAutoRebalance,
+  runAutoRebalanceForMultiplePools,
   setLogger,
   CONFIG,
 };

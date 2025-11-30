@@ -1,0 +1,35 @@
+{
+  "pools": [
+    {
+      "id": "0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b",
+      "name": "MMT 0.01%",
+      "symbol": "USDC-USDT",
+      "enabled": true,
+      "defaultRangePercent": 0.0001,
+      "tickSpacing": 1,
+      "description": "MMT Finance USDC-USDT 0.01% fee tier pool for auto-rebalancing"
+    },
+    {
+      "id": "0x737ec6a4d3ed0c7e6cc18d8ba04e7ffd4806b726c97efd89867597368c4d06a9",
+      "name": "MMT 0.001%",
+      "symbol": "USDC-USDT",
+      "enabled": false,
+      "defaultRangePercent": 0.0001,
+      "tickSpacing": 1,
+      "description": "MMT Finance USDC-USDT 0.001% fee tier pool (less common, disabled by default)"
+    }
+  ],
+  "updateInterval": 1800000,
+  "rebalanceInterval": 1800000,
+  "_comments": {
+    "id": "Sui pool contract address on mainnet",
+    "name": "Human-readable pool name (used in UI and Telegram notifications)",
+    "symbol": "Trading pair symbol (e.g., USDC-USDT)",
+    "enabled": "Whether to include this pool in auto-rebalancing checks",
+    "defaultRangePercent": "Default price range percentage (0.0001 = ±0.01%)",
+    "tickSpacing": "Pool tick spacing (typically 1 for Sui MMT pools)",
+    "description": "Optional description for reference",
+    "updateInterval": "Data fetch interval in milliseconds (30min = 1800000)",
+    "rebalanceInterval": "Rebalance check interval in milliseconds (30min = 1800000)"
+  }
+}
