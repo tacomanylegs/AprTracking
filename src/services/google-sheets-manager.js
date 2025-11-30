@@ -7,7 +7,7 @@ const SPREADSHEET_ID = '1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0';
 const SHEET_NAME = 'APR';
 const envLoader = require('../utils/env-loader');
 envLoader.load();
-const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_SERVICE_ACCOUNT_FILE || 'service-account.json');
+const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE;
 
 let authClient = null;
 
@@ -89,6 +89,7 @@ async function getAuthClient() {
     }
 
     try {
+        console.log("SERVICE_ACCOUNT_FILE:", SERVICE_ACCOUNT_FILE);
         if (!fs.existsSync(SERVICE_ACCOUNT_FILE)) {
             console.error('❌ service-account.json not found');
             return null;
