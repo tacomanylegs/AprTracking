@@ -44,11 +44,10 @@ async function getAuthClient() {
 
 /**
  * Append rebalance results to Google Sheet "Rebalance" tab
- * 欄位: 時間戳記, Pool ID, Pool 名稱, 執行結果
+ * 欄位: 時間戳記, Pool 名稱, 執行結果
  * 
  * @param {Array<Object>} results - 換倉結果陣列
  * @param {string} results[].timestamp - 時間戳記
- * @param {string} results[].poolId - Pool 合約地址
  * @param {string} results[].poolName - Pool 名稱
  * @param {string} results[].status - 執行結果
  * @returns {Promise<boolean>}
@@ -66,7 +65,6 @@ async function appendRebalanceResults(results) {
         // 建立行數據
         const rows = results.map(result => [
             result.timestamp,
-            result.poolId,
             result.poolName,
             result.status
         ]);
@@ -79,7 +77,7 @@ async function appendRebalanceResults(results) {
         // Append to Rebalance sheet
         await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${REBALANCE_SHEET_NAME}!A:D`,
+            range: `${REBALANCE_SHEET_NAME}!A:C`,
             valueInputOption: 'USER_ENTERED',
             resource: {
                 values: rows

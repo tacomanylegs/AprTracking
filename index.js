@@ -157,7 +157,6 @@ async function main() {
 
       sheetsData.push({
         timestamp: timestamp,
-        poolId: poolId,
         poolName: pool?.name || 'Unknown',
         status: statusText
       });
@@ -165,18 +164,25 @@ async function main() {
 
     await appendRebalanceResults(sheetsData);
 
-    // 4. 發送 Telegram 通知
-    console.log('');
-    console.log('📱 發送 Telegram 通知...');
+    // 4. 發送 Telegram 通知（僅在有換倉或錯誤時發送）
+    const shouldSendTelegram = results.summary.rebalanceExecutedCount > 0 || results.summary.failureCount > 0;
     
-    const telegram = new TelegramNotifier();
-    const message = formatTelegramMessage(results, timestamp);
-    
-    try {
-      await telegram.sendMessage(message);
-      console.log('✅ Telegram 通知已發送');
-    } catch (error) {
-      console.warn(`⚠️  Telegram 通知失敗: ${error.message}`);
+    if (shouldSendTelegram) {
+      console.log('');
+      console.log('📱 發送 Telegram 通知...');
+      
+      const telegram = new TelegramNotifier();
+      const message = formatTelegramMessage(results, timestamp);
+      
+      try {
+        await telegram.sendMessage(message);
+        console.log('✅ Telegram 通知已發送');
+      } catch (error) {
+        console.warn(`⚠️  Telegram 通知失敗: ${error.message}`);
+      }
+    } else {
+      console.log('');
+      console.log('📱 無需發送 Telegram 通知（無換倉且無錯誤）');
     }
 
     // 5. 輸出最終結果
