@@ -37,6 +37,11 @@ document.getElementById('dashboardBtn').addEventListener('click', () => {
     showHistoryView();
 });
 
+document.getElementById('headerSection').addEventListener('click', () => {
+    const sheetsUrl = 'https://docs.google.com/spreadsheets/d/1PKXeI9fq_zzv-zlUzWj_5a9z-PXl-_xd23Svg0MVSz0/edit?gid=0#gid=0';
+    shell.openExternal(sheetsUrl);
+});
+
 document.getElementById('backBtn').addEventListener('click', () => {
     ipcRenderer.send('restore-window');
     showMainView();

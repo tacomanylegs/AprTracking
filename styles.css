@@ -8,6 +8,30 @@ body {
     overflow-x: hidden;
 }
 
+/* Header Section */
+.header-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 12px;
+    border-radius: 8px 8px 0 0;
+    margin: -15px -15px 0 -15px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.header-section h1 {
+    margin: 0 0 4px 0;
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.header-section .subtitle {
+    margin: 0;
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: normal;
+}
+
 /* Main View Container */
 #main-view {
     padding: 15px;
@@ -29,6 +53,7 @@ h2 {
 .actions {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 button {
