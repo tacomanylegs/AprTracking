@@ -1,3 +1,0 @@
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "npm start", 0
-Set WshShell = Nothing

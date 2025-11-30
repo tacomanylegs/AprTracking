@@ -55,7 +55,7 @@ function resolveEnvPath() {
 
     envPath = foundRoot 
       ? path.join(foundRoot, '.env')
-      : path.join(__dirname, '..', '..', '.env');
+      : path.join(__dirname, '.env');
     
     console.log(`📝 ENV_PATH from default location: ${envPath}`);
   }

@@ -2,7 +2,7 @@ const https = require('https');
 
 // ============ Load Environment ============
 // 使用統一的 env-loader
-const envLoader = require('../utils/env-loader');
+const envLoader = require('./env-loader');
 envLoader.load();
 
 class TelegramNotifier {

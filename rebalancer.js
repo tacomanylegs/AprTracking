@@ -10,18 +10,18 @@
  *    - 開新倉位並加入流動性
  * 
  * 使用方式:
- *   node add-liquidity.js                           # 執行 (只在需要時)
- *   node add-liquidity.js --dry-run                 # 模擬執行（不送交易）
- *   node add-liquidity.js --range 0.02              # 使用 ±0.01% 範圍
- *   node add-liquidity.js --force                   # 強制執行（不檢查是否在範圍內）
- *   node add-liquidity.js --env-path /path/to/.env  # 指定 .env 檔案位置
+ *   node rebalancer.js                           # 執行 (只在需要時)
+ *   node rebalancer.js --dry-run                 # 模擬執行（不送交易）
+ *   node rebalancer.js --range 0.02              # 使用 ±0.01% 範圍
+ *   node rebalancer.js --force                   # 強制執行（不檢查是否在範圍內）
+ *   node rebalancer.js --env-path /path/to/.env  # 指定 .env 檔案位置
  * 
  * 環境變數:
- *   ENV_PATH=/path/to/.env node add-liquidity.js    # 透過環境變數指定 .env 位置
+ *   ENV_PATH=/path/to/.env node rebalancer.js    # 透過環境變數指定 .env 位置
  */
 
 
-const envLoader = require('../utils/env-loader');
+const envLoader = require('./env-loader');
 envLoader.load();
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
