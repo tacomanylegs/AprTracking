@@ -1,4 +1,11 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  ipcMain,
+  Notification,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -22,12 +29,14 @@ console.log(`📂 Looking for pools.json at: ${POOLS_CONFIG_FILE}`);
 let poolsConfig = {
   pools: [
     {
-      id: process.env.MMT_POOL_ID || '0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b',
-      name: 'MMT 0.01%',
-      symbol: 'USDC-USDT',
+      id:
+        process.env.MMT_POOL_ID ||
+        "0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b",
+      name: "MMT 0.01%",
+      symbol: "USDC-USDT",
       enabled: true,
       defaultRangePercent: 0.0001,
-    }
+    },
   ],
   updateInterval: 30 * 60 * 1000,
   rebalanceInterval: 30 * 60 * 1000,
@@ -37,15 +46,26 @@ if (fs.existsSync(POOLS_CONFIG_FILE)) {
   try {
     const fileContent = fs.readFileSync(POOLS_CONFIG_FILE, "utf8");
     poolsConfig = JSON.parse(fileContent);
-    console.log(`✅ Loaded pools.json with ${poolsConfig.pools.length} pool(s)`);
+    console.log(
+      `✅ Loaded pools.json with ${poolsConfig.pools.length} pool(s)`
+    );
     poolsConfig.pools.forEach((p, i) => {
-      console.log(`   [${i + 1}] ${p.name} (ID: ${p.id.substring(0, 10)}...) - Enabled: ${p.enabled}`);
+      console.log(
+        `   [${i + 1}] ${p.name} (ID: ${p.id.substring(0, 10)}...) - Enabled: ${
+          p.enabled
+        }`
+      );
     });
   } catch (e) {
-    console.warn("⚠️ Failed to parse pools.json, using default config:", e.message);
+    console.warn(
+      "⚠️ Failed to parse pools.json, using default config:",
+      e.message
+    );
   }
 } else {
-  console.warn(`⚠️ pools.json not found at ${POOLS_CONFIG_FILE}, using default config`);
+  console.warn(
+    `⚠️ pools.json not found at ${POOLS_CONFIG_FILE}, using default config`
+  );
 }
 
 // Import monitors
@@ -126,17 +146,21 @@ function createTray() {
     { label: "Open History", click: () => mainWindow.show() },
     { label: "Refresh Now", click: () => runUnifiedUpdateCycle() },
     { type: "separator" },
-    { 
-      label: "Auto Rebalance", 
+    {
+      label: "Auto Rebalance",
       type: "checkbox",
       checked: autoRebalanceEnabled,
       click: (menuItem) => {
         autoRebalanceEnabled = menuItem.checked;
-        console.log(`🔄 Auto rebalance ${autoRebalanceEnabled ? 'enabled' : 'disabled'}`);
+        console.log(
+          `🔄 Auto rebalance ${autoRebalanceEnabled ? "enabled" : "disabled"}`
+        );
         if (mainWindow) {
-          mainWindow.webContents.send('rebalance-status-changed', { enabled: autoRebalanceEnabled });
+          mainWindow.webContents.send("rebalance-status-changed", {
+            enabled: autoRebalanceEnabled,
+          });
         }
-      }
+      },
     },
     { label: "Rebalance Now", click: () => runRebalanceCheck() },
     { type: "separator" },
@@ -170,9 +194,15 @@ async function updateTrayIcon(text) {
         (prev.apr ?? 0) > (current.apr ?? 0) ? prev : current
       );
       const iconText = bestItem?.apr ? `${Math.round(bestItem.apr)}` : "?";
-      mainWindow.webContents.send("generate-icon", { text: iconText, isAlert: isAlertState });
+      mainWindow.webContents.send("generate-icon", {
+        text: iconText,
+        isAlert: isAlertState,
+      });
     } else {
-      mainWindow.webContents.send("generate-icon", { text, isAlert: isAlertState });
+      mainWindow.webContents.send("generate-icon", {
+        text,
+        isAlert: isAlertState,
+      });
     }
   }
 }
@@ -197,21 +227,24 @@ ipcMain.on("refresh-request", () => {
  * 並行執行 fetchAndDisplayData 和 runRebalanceCheck，然後合併結果並保存到 Google Sheets
  */
 async function runUnifiedUpdateCycle() {
-  console.log('🔄 Starting unified update cycle (APR + Rebalance)...');
+  console.log("🔄 Starting unified update cycle (APR + Rebalance)...");
 
   // 並行執行兩個函數，使用 allSettled 確保互不影響
   const [aprResult, rebalanceResult] = await Promise.allSettled([
     fetchAndDisplayData(),
-    runRebalanceCheck()
+    runRebalanceCheck(),
   ]);
 
-  const aprData = aprResult.status === 'fulfilled' ? aprResult.value : null;
-  const rebalanceData = rebalanceResult.status === 'fulfilled' ? rebalanceResult.value : null;
+  const aprData = aprResult.status === "fulfilled" ? aprResult.value : null;
+  const rebalanceData =
+    rebalanceResult.status === "fulfilled" ? rebalanceResult.value : null;
 
   // 記錄結果
-  console.log('📊 Unified cycle results:');
-  console.log(`   APR fetch: ${aprData ? '✅ Success' : '❌ Failed'}`);
-  console.log(`   Rebalance check: ${rebalanceData ? '✅ Success' : '❌ Failed'}`);
+  console.log("📊 Unified cycle results:");
+  console.log(`   APR fetch: ${aprData ? "✅ Success" : "❌ Failed"}`);
+  console.log(
+    `   Rebalance check: ${rebalanceData ? "✅ Success" : "❌ Failed"}`
+  );
 
   // 保存到本地文件
   if (aprData) {
@@ -223,7 +256,7 @@ async function runUnifiedUpdateCycle() {
     const historyData = {
       aprResults: aprData ? aprData.data : null,
       rebalanceResults: rebalanceData ? rebalanceData.resultsByPool : {},
-      timestamp: aprData?.timestamp || new Date().toISOString()
+      timestamp: aprData?.timestamp || new Date().toISOString(),
     };
 
     sheetsManager.appendHistoryWithRebalance(historyData).catch((e) => {
@@ -257,29 +290,44 @@ async function fetchAndDisplayData() {
     // Update buy price range from Google Sheets before checking
     const newRange = await sheetsManager.getBuyPriceRange();
     if (newRange) {
-        currentPriceRange = newRange;
-        console.log(`🔄 Updated buy price range from Sheets: ${currentPriceRange.min} - ${currentPriceRange.max}`);
-        
-        // Update UI with new price range
-        if (mainWindow) {
-            mainWindow.webContents.send('initial-buy-price', currentPriceRange);
-        }
+      currentPriceRange = newRange;
+      console.log(
+        `🔄 Updated buy price range from Sheets: ${currentPriceRange.min} - ${currentPriceRange.max}`
+      );
+
+      // Update UI with new price range
+      if (mainWindow) {
+        mainWindow.webContents.send("initial-buy-price", currentPriceRange);
+      }
     }
 
     // Parallel fetch
     console.log("Starting parallel fetch for all pools...");
-    const [takaraUsdt, takaraUsdc, mmt001Result, mmt0001Result] = await Promise.all([
-      takaralendMonitor.getAPR("USDT").catch((e) => { console.error("Takara USDT Error:", e); return null; }),
-      takaralendMonitor.getAPR("USDC").catch((e) => { console.error("Takara USDC Error:", e); return null; }),
-      mmt001Monitor.getAPR().catch((e) => { console.error("MMT 0.01% Error:", e); return { apr: null, usdcPrice: null }; }),
-      mmt0001Monitor.getAPR().catch((e) => { console.error("MMT 0.001% Error:", e); return { apr: null, usdcPrice: null }; })
-    ]);
+    const [takaraUsdt, takaraUsdc, mmt001Result, mmt0001Result] =
+      await Promise.all([
+        takaralendMonitor.getAPR("USDT").catch((e) => {
+          console.error("Takara USDT Error:", e);
+          return null;
+        }),
+        takaralendMonitor.getAPR("USDC").catch((e) => {
+          console.error("Takara USDC Error:", e);
+          return null;
+        }),
+        mmt001Monitor.getAPR().catch((e) => {
+          console.error("MMT 0.01% Error:", e);
+          return { apr: null, usdcPrice: null };
+        }),
+        mmt0001Monitor.getAPR().catch((e) => {
+          console.error("MMT 0.001% Error:", e);
+          return { apr: null, usdcPrice: null };
+        }),
+      ]);
 
     console.log("Fetch results:", {
       takaraUsdt,
       takaraUsdc,
       mmt001: mmt001Result,
-      mmt0001: mmt0001Result
+      mmt0001: mmt0001Result,
     });
 
     const results = [
@@ -306,8 +354,10 @@ async function fetchAndDisplayData() {
     // Check price alert for MMT (Use 0.01% pool as reference)
     const mmtUsdcPrice = mmt001Result?.usdcPrice ?? null;
     if (mmtUsdcPrice !== null) {
-      const isPriceAlert = mmtUsdcPrice < currentPriceRange.min || mmtUsdcPrice > currentPriceRange.max;
-      
+      const isPriceAlert =
+        mmtUsdcPrice < currentPriceRange.min ||
+        mmtUsdcPrice > currentPriceRange.max;
+
       // Only trigger notification if:
       // 1. Price is outside range
       // 2. Current price is different from last alerted price (new price change)
@@ -342,9 +392,8 @@ async function fetchAndDisplayData() {
     // 返回 APR 數據（不直接保存，由統一計時器處理）
     return {
       timestamp: new Date().toISOString(),
-      data: results
+      data: results,
     };
-
   } catch (error) {
     console.error("Error fetching data:", error);
     if (tray) tray.setToolTip("Error fetching data");
@@ -453,23 +502,23 @@ ipcMain.handle("get-buy-price", async () => {
 ipcMain.handle("set-buy-price", async (event, range) => {
   const min = parseFloat(range.min);
   const max = parseFloat(range.max);
-  
+
   if (isNaN(min) || isNaN(max)) return false;
-  
+
   currentPriceRange = { min, max };
   lastAlertedPrice = null; // Reset alert when buy price changes
   isAlertState = false;
-  
+
   // Save to Google Sheets
   const success = await sheetsManager.setBuyPriceRange(min, max);
   console.log(`💰 Buy price range updated: ${min} - ${max}`);
-  
+
   // Update icon to remove alert state
   const history = readHistory();
   if (history.length > 0) {
     updateTrayIcon(history[history.length - 1].data);
   }
-  
+
   return success;
 });
 
@@ -480,8 +529,8 @@ ipcMain.handle("get-alert-state", () => {
 
 // Get rebalance status
 ipcMain.handle("get-rebalance-status", () => {
-  return { 
-    enabled: autoRebalanceEnabled, 
+  return {
+    enabled: autoRebalanceEnabled,
     lastResultsByPool: lastRebalanceResultsByPool,
     intervalMs: REBALANCE_INTERVAL_MS,
   };
@@ -490,7 +539,9 @@ ipcMain.handle("get-rebalance-status", () => {
 // Toggle auto rebalance
 ipcMain.handle("set-rebalance-enabled", (event, enabled) => {
   autoRebalanceEnabled = enabled;
-  console.log(`🔄 Auto rebalance ${autoRebalanceEnabled ? 'enabled' : 'disabled'}`);
+  console.log(
+    `🔄 Auto rebalance ${autoRebalanceEnabled ? "enabled" : "disabled"}`
+  );
   return autoRebalanceEnabled;
 });
 
@@ -504,16 +555,16 @@ ipcMain.handle("trigger-rebalance", async () => {
  */
 function showPriceAlert(currentPrice, range) {
   const message = `⚠️ MMT 價格警報: ${currentPrice} USDC\n(設定範圍: ${range.min} - ${range.max})`;
-  
+
   // 1. Windows Notification
   if (Notification.isSupported()) {
     const notification = new Notification({
-      title: '⚠️ MMT 通知',
-      icon: path.join(__dirname, 'assets', 'icon.png'),
-      silent: false
+      title: "⚠️ MMT 通知",
+      icon: path.join(__dirname, "assets", "icon.png"),
+      silent: false,
     });
 
-    notification.on('click', () => {
+    notification.on("click", () => {
       if (mainWindow) {
         mainWindow.show();
         mainWindow.focus();
@@ -522,11 +573,12 @@ function showPriceAlert(currentPrice, range) {
 
     notification.show();
   } else {
-    console.warn('⚠️  Notifications not supported');
+    console.warn("⚠️  Notifications not supported");
   }
 
   // 2. Telegram Notification
-  const mmtUrl = 'https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b';
+  const mmtUrl =
+    "https://app.mmt.finance/liquidity/0xb0a595cb58d35e07b711ac145b4846c8ed39772c6d6f6716d89d71c64384543b";
   const tgMessage = `
 <b>⚠️ MMT 價格警報</b>
 
@@ -538,11 +590,13 @@ function showPriceAlert(currentPrice, range) {
 <i>請檢查您的倉位，若需調整通知範圍，請至桌面小工具設定。</i>
 `;
 
-  telegramNotifier.sendMessage(tgMessage).catch(err => {
-    console.error('❌ Telegram notification failed:', err.message);
+  telegramNotifier.sendMessage(tgMessage).catch((err) => {
+    console.error("❌ Telegram notification failed:", err.message);
   });
 
-  console.log(`🚨 Price alert triggered: ${currentPrice} (Range: ${range.min}-${range.max})`);
+  console.log(
+    `🚨 Price alert triggered: ${currentPrice} (Range: ${range.min}-${range.max})`
+  );
 }
 
 /**
@@ -551,49 +605,56 @@ function showPriceAlert(currentPrice, range) {
  */
 async function runRebalanceCheck() {
   if (!autoRebalanceEnabled) {
-    console.log('⏸️  Auto rebalance is disabled, skipping...');
+    console.log("⏸️  Auto rebalance is disabled, skipping...");
     return { resultsByPool: {} };
   }
 
-  console.log('🔄 Running auto rebalance check for all enabled pools...');
-  
+  console.log("🔄 Running auto rebalance check for all enabled pools...");
+
   // 通知 UI 開始換倉檢查
   if (mainWindow) {
-    mainWindow.webContents.send('rebalance-started');
+    mainWindow.webContents.send("rebalance-started");
   }
 
   try {
     // 獲取所有啟用的 Pool ID
-    const enabledPools = poolsConfig.pools.filter(p => p.enabled);
-    
+    const enabledPools = poolsConfig.pools.filter((p) => p.enabled);
+
     if (enabledPools.length === 0) {
-      console.log('⚠️  No enabled pools found');
+      console.log("⚠️  No enabled pools found");
       const result = {
         success: true,
-        message: 'No enabled pools',
+        message: "No enabled pools",
         resultsByPool: {},
         timestamp: new Date().toISOString(),
       };
-      
+
       if (mainWindow) {
-        mainWindow.webContents.send('rebalance-completed', result);
+        mainWindow.webContents.send("rebalance-completed", result);
       }
-      
+
       return result;
     }
 
-    const poolIds = enabledPools.map(p => p.id);
-    console.log(`📊 Processing ${enabledPools.length} pool(s): ${enabledPools.map(p => p.name).join(', ')}`);
+    const poolIds = enabledPools.map((p) => p.id);
+    console.log(
+      `📊 Processing ${enabledPools.length} pool(s): ${enabledPools
+        .map((p) => p.name)
+        .join(", ")}`
+    );
 
     // 並行執行多個 Pool 的換倉檢查
-    const multiPoolResult = await rebalancer.runAutoRebalanceForMultiplePools(poolIds, {
-      dryRun: false,
-      force: false,
-    });
+    const multiPoolResult = await rebalancer.runAutoRebalanceForMultiplePools(
+      poolIds,
+      {
+        dryRun: false,
+        force: false,
+      }
+    );
 
     // 為每個 Pool 結果添加 Pool 名稱、符號和時間戳（包括無需操作的 Pool）
     const enrichedResults = {};
-    enabledPools.forEach(pool => {
+    enabledPools.forEach((pool) => {
       const result = multiPoolResult.resultsByPool[pool.id];
       if (result) {
         enrichedResults[pool.id] = {
@@ -609,7 +670,7 @@ async function runRebalanceCheck() {
 
     // 通知 UI 換倉結果
     if (mainWindow) {
-      mainWindow.webContents.send('rebalance-completed', {
+      mainWindow.webContents.send("rebalance-completed", {
         success: true,
         resultsByPool: enrichedResults,
         summary: multiPoolResult.summary,
@@ -619,34 +680,48 @@ async function runRebalanceCheck() {
     // 為每個執行的換倉發送 Telegram 通知
     for (const poolId in enrichedResults) {
       const result = enrichedResults[poolId];
-      const pool = enabledPools.find(p => p.id === poolId);
+      const pool = enabledPools.find((p) => p.id === poolId);
 
       if (result.rebalanceExecuted) {
-        const txUrl = result.digest 
+        const txUrl = result.digest
           ? `https://suiscan.xyz/mainnet/tx/${result.digest}`
           : null;
-        
+
         const tgMessage = `
 <b>🔄 MMT 自動換倉完成</b>
 
 📍 <b>Pool:</b> ${result.poolName} (${result.poolSymbol})
-✅ <b>狀態:</b> ${result.success ? '成功' : '失敗'}
-${result.tickRange ? `📈 <b>新價格範圍:</b> ${parseFloat(result.tickRange.lowerPrice).toFixed(6)} - ${parseFloat(result.tickRange.upperPrice).toFixed(6)}` : ''}
-${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
+✅ <b>狀態:</b> ${result.success ? "成功" : "失敗"}
+${
+  result.tickRange
+    ? `📈 <b>新價格範圍:</b> ${parseFloat(result.tickRange.lowerPrice).toFixed(
+        6
+      )} - ${parseFloat(result.tickRange.upperPrice).toFixed(6)}`
+    : ""
+}
+${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ""}
 
-<i>自動換倉已於 ${new Date().toLocaleString('zh-TW')} 執行</i>
+<i>自動換倉已於 ${new Date().toLocaleString("zh-TW")} 執行</i>
 `;
 
-        telegramNotifier.sendMessage(tgMessage).catch(err => {
-          console.error('❌ Telegram notification failed:', err.message);
+        telegramNotifier.sendMessage(tgMessage).catch((err) => {
+          console.error("❌ Telegram notification failed:", err.message);
         });
 
-        console.log(`✅ [${result.poolName}] Rebalance executed successfully: ${result.digest || 'N/A'}`);
+        console.log(
+          `✅ [${result.poolName}] Rebalance executed successfully: ${
+            result.digest || "N/A"
+          }`
+        );
       } else if (result.rebalanceNeeded === false) {
-        console.log(`✅ [${result.poolName}] No rebalance needed - positions are in range`);
+        console.log(
+          `✅ [${result.poolName}] No rebalance needed - positions are in range`
+        );
       } else if (result.error) {
-        console.error(`❌ [${result.poolName}] Rebalance error: ${result.error}`);
-        
+        console.error(
+          `❌ [${result.poolName}] Rebalance error: ${result.error}`
+        );
+
         // 發送錯誤通知
         const tgMessage = `
 <b>❌ MMT 自動換倉失敗</b>
@@ -657,8 +732,8 @@ ${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
 <i>請檢查錢包餘額和私鑰設定</i>
 `;
 
-        telegramNotifier.sendMessage(tgMessage).catch(err => {
-          console.error('❌ Telegram notification failed:', err.message);
+        telegramNotifier.sendMessage(tgMessage).catch((err) => {
+          console.error("❌ Telegram notification failed:", err.message);
         });
       }
     }
@@ -669,10 +744,9 @@ ${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
       resultsByPool: enrichedResults,
       summary: multiPoolResult.summary,
     };
-
   } catch (error) {
-    console.error('❌ Rebalance check failed:', error.message);
-    
+    console.error("❌ Rebalance check failed:", error.message);
+
     const result = {
       success: false,
       error: error.message,
@@ -683,7 +757,7 @@ ${txUrl ? `\n<a href="${txUrl}">🔗 查看交易</a>` : ''}
     lastRebalanceResultsByPool = {};
 
     if (mainWindow) {
-      mainWindow.webContents.send('rebalance-completed', result);
+      mainWindow.webContents.send("rebalance-completed", result);
     }
 
     return result;
@@ -696,21 +770,23 @@ process.on("unhandledRejection", (reason, p) => {
 
 app.whenReady().then(async () => {
   console.log("App Ready");
-  
+
   // ========== Startup Flow ==========
 
   // Step 0: Load buy price from Google Sheets (BEFORE creating window)
   console.log("💰 Step 0: Loading buy price range from Google Sheets...");
   currentPriceRange = await sheetsManager.getBuyPriceRange();
-  console.log(`✅ Buy price range loaded: ${currentPriceRange.min} - ${currentPriceRange.max}`);
-  
+  console.log(
+    `✅ Buy price range loaded: ${currentPriceRange.min} - ${currentPriceRange.max}`
+  );
+
   // Now create window and tray
   createWindow();
   createTray();
-  
+
   // Send initial buy price to renderer once window is ready
-  mainWindow.webContents.once('did-finish-load', () => {
-    mainWindow.webContents.send('initial-buy-price', currentPriceRange);
+  mainWindow.webContents.once("did-finish-load", () => {
+    mainWindow.webContents.send("initial-buy-price", currentPriceRange);
   });
 
   // Step 1: Fetch online history from Google Sheets
@@ -773,34 +849,34 @@ app.whenReady().then(async () => {
   const now = new Date().getTime();
   const timeSinceLastUpdate = now - lastUpdateTime;
 
-  // Check if the last entry has the new MMT structure
-  const hasNewStructure = lastEntry && lastEntry.data.some(d => d.name === 'MMT 0.01%');
+  // Decide if initial fetch is needed
+  const needsInitialFetch =
+    !lastEntry || timeSinceLastUpdate >= UPDATE_INTERVAL_MS;
 
-  if (!lastEntry || timeSinceLastUpdate >= UPDATE_INTERVAL_MS || !hasNewStructure) {
-    if (!hasNewStructure) {
-      console.log("⚠️  Old data structure detected, forcing update...");
-    } else {
-      console.log("⏰ Data expired, fetching new data...");
-    }
-    // 使用統一的更新循環代替直接調用 fetchAndDisplayData
+  if (needsInitialFetch) {
+    console.log("⏰ Data expired or missing, fetching new data...");
+    // 立即執行初始化更新循環
+    console.log("🔄 Running initial unified update cycle immediately...");
     runUnifiedUpdateCycle();
   } else {
     console.log(
       `✅ Data still valid (${Math.round(timeSinceLastUpdate / 1000)}s ago)`
     );
-    
+
     // Check MMT price alert even if data is still valid
     if (lastEntry) {
-      const mmtEntry = lastEntry.data.find(d => d.name === 'MMT 0.01%');
+      const mmtEntry = lastEntry.data.find((d) => d.name === "MMT 0.01%");
       if (mmtEntry && mmtEntry.usdcPrice !== null) {
-        const isPriceAlert = mmtEntry.usdcPrice < currentPriceRange.min || mmtEntry.usdcPrice > currentPriceRange.max;
-        
+        const isPriceAlert =
+          mmtEntry.usdcPrice < currentPriceRange.min ||
+          mmtEntry.usdcPrice > currentPriceRange.max;
+
         if (isPriceAlert && mmtEntry.usdcPrice !== lastAlertedPrice) {
           console.log("🚨 Checking initial price alert on startup...");
           showPriceAlert(mmtEntry.usdcPrice, currentPriceRange);
           lastAlertedPrice = mmtEntry.usdcPrice;
           isAlertState = true;
-          
+
           // Update tray icon with alert color
           updateTrayIcon(lastEntry.data);
         } else if (!isPriceAlert) {
@@ -813,14 +889,10 @@ app.whenReady().then(async () => {
   // Schedule periodic unified updates (APR + Rebalance in parallel)
   updateInterval = setInterval(runUnifiedUpdateCycle, UPDATE_INTERVAL_MS);
   console.log(
-    `⏱️  Scheduled unified update cycle every ${UPDATE_INTERVAL_MS / 60000} minutes (APR + Rebalance)`
+    `⏱️  Scheduled unified update cycle every ${
+      UPDATE_INTERVAL_MS / 60000
+    } minutes (APR + Rebalance)`
   );
-
-  // Run initial cycle (after a short delay to let UI load)
-  setTimeout(() => {
-    console.log('🔄 Running initial unified update cycle...');
-    runUnifiedUpdateCycle();
-  }, 5000);
 });
 
 app.on("window-all-closed", () => {
