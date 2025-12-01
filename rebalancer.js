@@ -163,34 +163,41 @@ function calculateTickRange(pool, rangePercent) {
   
   log(`Current price: ${currentPrice.toString()}`);
   
-  // 計算 ±rangePercent 價格範圍
-  const lowerPrice = currentPrice.mul(new Decimal(1 - rangePercent));
-  const upperPrice = currentPrice.mul(new Decimal(1 + rangePercent));
-  
-  log(`Target price range: ${lowerPrice.toString()} - ${upperPrice.toString()}`);
-  
-  // 轉換為 sqrtPriceX64
-  const lowerSqrtPrice = TickMath.priceToSqrtPriceX64(
-    lowerPrice,
-    pool.tokenX?.decimals || 6,
-    pool.tokenY?.decimals || 6
-  );
-  const upperSqrtPrice = TickMath.priceToSqrtPriceX64(
-    upperPrice,
-    pool.tokenX?.decimals || 6,
-    pool.tokenY?.decimals || 6
-  );
-  
-  // 轉換為 tick index（對齊 tick spacing）
-  const lowerTick = TickMath.sqrtPriceX64ToTickIndex(lowerSqrtPrice);
-  const upperTick = TickMath.sqrtPriceX64ToTickIndex(upperSqrtPrice);
-  
-  // 對齊 tick spacing
+  // 獲取當前 tick
+  const currentTick = parseInt(pool.currentTickIndex);
   const tickSpacing = pool.tickSpacing || 1;
-  const alignedLowerTick = Math.floor(lowerTick / tickSpacing) * tickSpacing;
-  const alignedUpperTick = Math.ceil(upperTick / tickSpacing) * tickSpacing;
   
-  log(`Tick range: ${alignedLowerTick} - ${alignedUpperTick} (spacing: ${tickSpacing})`);
+  // 根據 rangePercent 計算 tick 偏移量
+  // 價格和 tick 的關係: price = 1.0001^tick
+  // 所以 tick = log(price) / log(1.0001)
+  // 如果我們想要 ±rangePercent 的價格範圍，
+  // 對應的 tick 偏移量 = log(1 + rangePercent) / log(1.0001)
+  const tickOffset = Math.abs(Math.log(1 + rangePercent) / Math.log(1.0001));
+  
+  // 對齊 tick spacing，以當前 tick 為中心對稱
+  const alignedCurrentTick = Math.round(currentTick / tickSpacing) * tickSpacing;
+  const alignedOffset = Math.ceil(tickOffset / tickSpacing) * tickSpacing;
+  
+  const alignedLowerTick = alignedCurrentTick - alignedOffset;
+  const alignedUpperTick = alignedCurrentTick + alignedOffset;
+  
+  // 計算對應的價格範圍
+  const lowerSqrtPrice = TickMath.tickIndexToSqrtPriceX64(alignedLowerTick);
+  const upperSqrtPrice = TickMath.tickIndexToSqrtPriceX64(alignedUpperTick);
+  
+  const lowerPrice = TickMath.sqrtPriceX64ToPrice(
+    lowerSqrtPrice,
+    pool.tokenX?.decimals || 6,
+    pool.tokenY?.decimals || 6
+  );
+  const upperPrice = TickMath.sqrtPriceX64ToPrice(
+    upperSqrtPrice,
+    pool.tokenX?.decimals || 6,
+    pool.tokenY?.decimals || 6
+  );
+  
+  log(`Target tick range: ${alignedLowerTick} - ${alignedUpperTick} (center: ${alignedCurrentTick}, offset: ±${alignedOffset}, spacing: ${tickSpacing})`);
+  log(`Target price range: ${lowerPrice.toFixed(10)} - ${upperPrice.toFixed(10)}`);
   
   return {
     lowerPrice: lowerPrice.toString(),
@@ -912,18 +919,50 @@ async function closeAllPositions(poolIds, options = {}) {
             }
             
             // Remove all liquidity
+            // 最後一個參數是 recipientAddress，設為 undefined 讓我們手動處理 coin transfer
             const { removeLpCoinA, removeLpCoinB } = mmtSdk.Pool.removeLiquidity(
               txb,
               poolParams,
               pos.objectId,
               BigInt(pos.liquidity.toString()),
-              BigInt(0),
-              BigInt(0),
-              undefined
+              BigInt(0), // min_amount_x
+              BigInt(0), // min_amount_y
+              undefined  // recipientAddress - 不自動轉移，稍後統一處理
             );
             coinsList.push(removeLpCoinA, removeLpCoinB);
             
             // Close position
+            mmtSdk.Position.closePosition(txb, pos.objectId);
+            closedCount++;
+          } else {
+            // 零流動性倉位 - 仍需收取可能累積的費用，然後關閉
+            log(`Position ${pos.objectId} has zero liquidity, collecting fees and closing...`);
+            
+            // 嘗試收取費用（即使流動性為零，可能還有累積的交易費用）
+            const { feeCoinA, feeCoinB } = mmtSdk.Pool.collectFee(
+              txb,
+              poolParams,
+              pos.objectId,
+              undefined
+            );
+            coinsList.push(feeCoinA, feeCoinB);
+            
+            // 收取獎勵
+            if (pool.rewarders && pool.rewarders.length > 0) {
+              const rewardCoins = mmtSdk.Pool.collectAllRewards(
+                txb,
+                poolParams,
+                pool.rewarders,
+                pos.objectId,
+                undefined
+              );
+              
+              if (rewardCoins && rewardCoins.length > 0) {
+                coinsList.push(...rewardCoins);
+              }
+            }
+            
+            // 直接關閉倉位
             mmtSdk.Position.closePosition(txb, pos.objectId);
             closedCount++;
           }
