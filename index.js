@@ -70,8 +70,12 @@ function formatTelegramMessage(results, timestamp) {
       statusText = `失敗: ${result.error.substring(0, 30)}`;
     } else if (result.rebalanceExecuted && result.success) {
       statusEmoji = '✅';
-      const digestShort = result.digest ? result.digest.substring(0, 12) : 'N/A';
-      statusText = `換倉成功 (${digestShort}...)`;
+      if (result.digest) {
+        const txUrl = `https://suiscan.xyz/mainnet/tx/${result.digest}`;
+        statusText = `換倉成功 <a href="${txUrl}">🔗 查看交易</a>`;
+      } else {
+        statusText = `換倉成功`;
+      }
     } else if (result.rebalanceNeeded === false) {
       statusEmoji = '⏸';
       statusText = '無需換倉（倉位在範圍內）';
