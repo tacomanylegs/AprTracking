@@ -818,6 +818,195 @@ async function runAutoRebalanceForMultiplePools(poolIds, options = {}) {
   }
 }
 
+// ============ Close All Positions Function ============
+/**
+ * 關閉所有 Pool 中的所有倉位
+ * @param {Array<string>} poolIds - Pool 合約地址陣列
+ * @param {Object} options - 選項
+ * @param {boolean} options.dryRun - 是否模擬執行
+ * @returns {Promise<Object>} 執行結果
+ */
+async function closeAllPositions(poolIds, options = {}) {
+  const dryRun = options.dryRun ?? false;
+  
+  log('========================================');
+  log('Close All Positions');
+  log('========================================');
+  log(`Mode: ${dryRun ? 'DRY RUN' : 'EXECUTE'}`);
+  log(`Total Pools: ${poolIds.length}`);
+  log('');
+  
+  try {
+    // 1. 初始化
+    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    log(`Wallet address: ${address}`);
+    log('');
+    
+    const allResults = [];
+    
+    // 2. 遍歷每個 Pool
+    for (const poolId of poolIds) {
+      try {
+        log(`Processing pool: ${poolId}`);
+        
+        // 獲取 Pool 資料
+        const pool = await fetchPoolData(mmtSdk, poolId);
+        
+        // 查找現有倉位
+        const existingPositions = await findUserPositions(mmtSdk, address, poolId, pool);
+        
+        if (existingPositions.length === 0) {
+          log(`⚠️  No positions found in pool ${poolId}`);
+          allResults.push({
+            poolId,
+            success: true,
+            positionsClosedCount: 0,
+            message: 'No positions to close'
+          });
+          continue;
+        }
+        
+        log(`Found ${existingPositions.length} position(s) to close`);
+        
+        // 3. 建構關閉交易
+        const txb = new Transaction();
+        txb.setSender(address);
+        
+        const poolParams = {
+          objectId: pool.poolId,
+          tokenXType: pool.tokenXType,
+          tokenYType: pool.tokenYType,
+          tickSpacing: pool.tickSpacing,
+        };
+        
+        let closedCount = 0;
+        const coinsList = [];
+        
+        for (const pos of existingPositions) {
+          if (pos.liquidity && !pos.liquidity.isZero()) {
+            log(`Removing liquidity from position ${pos.objectId}...`);
+            
+            // Collect fees
+            const { feeCoinA, feeCoinB } = mmtSdk.Pool.collectFee(
+              txb,
+              poolParams,
+              pos.objectId,
+              undefined
+            );
+            coinsList.push(feeCoinA, feeCoinB);
+            
+            // Collect rewards if any
+            if (pool.rewarders && pool.rewarders.length > 0) {
+              log(`Collecting rewards from position ${pos.objectId}...`);
+              const rewardCoins = mmtSdk.Pool.collectAllRewards(
+                txb,
+                poolParams,
+                pool.rewarders,
+                pos.objectId,
+                undefined
+              );
+              
+              if (rewardCoins && rewardCoins.length > 0) {
+                coinsList.push(...rewardCoins);
+              }
+            }
+            
+            // Remove all liquidity
+            const { removeLpCoinA, removeLpCoinB } = mmtSdk.Pool.removeLiquidity(
+              txb,
+              poolParams,
+              pos.objectId,
+              BigInt(pos.liquidity.toString()),
+              BigInt(0),
+              BigInt(0),
+              undefined
+            );
+            coinsList.push(removeLpCoinA, removeLpCoinB);
+            
+            // Close position
+            mmtSdk.Position.closePosition(txb, pos.objectId);
+            closedCount++;
+          }
+        }
+        
+        // 轉移所有收集的幣給用戶
+        if (coinsList.length > 0) {
+          txb.transferObjects(coinsList, txb.pure.address(address));
+        }
+        
+        // 4. 執行交易
+        const result = await executeTransaction(suiClient, keypair, txb, dryRun);
+        
+        if (result.success) {
+          logSuccess(`Successfully closed ${closedCount} position(s) in pool ${poolId}`);
+          if (result.digest) {
+            log(`Transaction: https://suiscan.xyz/mainnet/tx/${result.digest}`);
+          }
+        } else {
+          logError(`Failed to close positions in pool ${poolId}`);
+        }
+        
+        allResults.push({
+          poolId,
+          success: result.success,
+          positionsClosedCount: closedCount,
+          digest: result.digest || null,
+          error: result.error || null
+        });
+        
+      } catch (error) {
+        logError(`Error processing pool ${poolId}: ${error.message}`);
+        allResults.push({
+          poolId,
+          success: false,
+          positionsClosedCount: 0,
+          error: error.message
+        });
+      }
+      
+      log('');
+    }
+    
+    // 5. 統計摘要
+    const summary = {
+      totalPools: poolIds.length,
+      successCount: allResults.filter(r => r.success).length,
+      totalPositionsClosed: allResults.reduce((sum, r) => sum + r.positionsClosedCount, 0),
+      failureCount: allResults.filter(r => !r.success).length,
+    };
+    
+    log('========================================');
+    log('Close All Positions Summary');
+    log('========================================');
+    log(`✅ Success: ${summary.successCount}/${summary.totalPools}`);
+    log(`🔒 Positions Closed: ${summary.totalPositionsClosed}`);
+    if (summary.failureCount > 0) {
+      log(`❌ Failures: ${summary.failureCount}`);
+    }
+    log('========================================');
+    
+    return {
+      allResults,
+      summary,
+      timestamp: new Date().toISOString(),
+    };
+    
+  } catch (error) {
+    logError(`Fatal error: ${error.message}`);
+    return {
+      allResults: [],
+      summary: {
+        totalPools: poolIds.length,
+        successCount: 0,
+        totalPositionsClosed: 0,
+        failureCount: poolIds.length,
+      },
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
 // 導出供其他模組使用
 module.exports = {
   initializeSDK,
@@ -831,6 +1020,7 @@ module.exports = {
   executeTransaction,
   runAutoRebalance,
   runAutoRebalanceForMultiplePools,
+  closeAllPositions,
   setLogger,
   CONFIG,
 };

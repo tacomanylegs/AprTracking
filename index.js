@@ -17,7 +17,7 @@ require('./env-config');
 const envLoader = require('./env-loader');
 envLoader.load();
 
-const { runAutoRebalanceForMultiplePools } = require('./rebalancer');
+const { runAutoRebalanceForMultiplePools, closeAllPositions } = require('./rebalancer');
 const { appendRebalanceResults } = require('./google-sheets-manager');
 const TelegramNotifier = require('./telegram-notifier');
 
@@ -46,7 +46,8 @@ function parseArgs() {
   const args = process.argv.slice(2);
   return {
     dryRun: args.includes('--dry-run'),
-    force: args.includes('--force')
+    force: args.includes('--force'),
+    closeAll: args.includes('--close-all')
   };
 }
 
@@ -114,6 +115,9 @@ async function main() {
   console.log('========================================');
   console.log(`時間: ${timestamp}`);
   console.log(`模式: ${options.dryRun ? '模擬執行 (DRY RUN)' : '正式執行'}`);
+  if (options.closeAll) {
+    console.log('操作: 關閉所有倉位');
+  }
   console.log('');
 
   try {
@@ -128,6 +132,42 @@ async function main() {
 
     console.log(`📋 啟用的 Pool: ${enabledPools.map(p => p.name).join(', ')}`);
     console.log('');
+
+    // 2. 如果是關閉倉位模式
+    if (options.closeAll) {
+      console.log('🔒 正在關閉所有倉位...');
+      console.log('');
+      
+      const closeResults = await closeAllPositions(poolIds, {
+        dryRun: options.dryRun
+      });
+      
+      console.log('');
+      console.log('========================================');
+      console.log('關閉倉位結果');
+      console.log('========================================');
+      for (const result of closeResults.allResults) {
+        const pool = POOLS.find(p => p.id === result.poolId);
+        const poolName = pool?.name || 'Unknown';
+        console.log(`${result.success ? '✅' : '❌'} ${poolName}: ${result.positionsClosedCount} 個倉位已關閉`);
+        if (result.digest) {
+          console.log(`   Transaction: https://suiscan.xyz/mainnet/tx/${result.digest}`);
+        }
+        if (result.error) {
+          console.log(`   Error: ${result.error}`);
+        }
+      }
+      console.log('');
+      console.log('摘要:');
+      console.log(`   成功: ${closeResults.summary.successCount}/${closeResults.summary.totalPools}`);
+      console.log(`   關閉的倉位總數: ${closeResults.summary.totalPositionsClosed}`);
+      if (closeResults.summary.failureCount > 0) {
+        console.log(`   失敗: ${closeResults.summary.failureCount}`);
+      }
+      console.log('========================================');
+      
+      process.exit(closeResults.summary.failureCount > 0 ? 1 : 0);
+    }
 
     // 2. 執行自動換倉
     const results = await runAutoRebalanceForMultiplePools(poolIds, {
