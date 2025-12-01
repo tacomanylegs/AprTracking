@@ -222,19 +222,58 @@ async function findUserPositions(mmtSdk, address, poolId, pool = null) {
   }
 }
 
+// ============ Convert Tick to Price ============
+function tickToPrice(tick, pool) {
+  try {
+    const sqrtPrice = TickMath.tickIndexToSqrtPriceX64(tick);
+    const price = TickMath.sqrtPriceX64ToPrice(
+      sqrtPrice,
+      pool.tokenX?.decimals || 6,
+      pool.tokenY?.decimals || 6
+    );
+    return new Decimal(price);
+  } catch (e) {
+    return null;
+  }
+}
+
+// ============ Get Current Price ============
+function getCurrentPrice(pool) {
+  try {
+    const currentSqrtPrice = new BN(pool.currentSqrtPrice);
+    const price = TickMath.sqrtPriceX64ToPrice(
+      currentSqrtPrice,
+      pool.tokenX?.decimals || 6,
+      pool.tokenY?.decimals || 6
+    );
+    return new Decimal(price);
+  } catch (e) {
+    return null;
+  }
+}
+
 // ============ Check if Position is Out of Range ============
 function checkPositionOutOfRange(position, pool) {
-  // 獲取當前 tick
-  const currentTick = parseInt(pool.currentTickIndex);
+  // 獲取當前價格
+  const currentPrice = getCurrentPrice(pool);
+  if (!currentPrice) {
+    log(`Position ${position.objectId}: Failed to get current price`);
+    return true;
+  }
   
-  // 獲取倉位的 tick 範圍
-  const lowerTick = position.lowerTick;
-  const upperTick = position.upperTick;
+  // 獲取倉位的價格範圍
+  const lowerPrice = tickToPrice(position.lowerTick, pool);
+  const upperPrice = tickToPrice(position.upperTick, pool);
+  
+  if (!lowerPrice || !upperPrice) {
+    log(`Position ${position.objectId}: Failed to get position price range`);
+    return true;
+  }
   
   // 檢查當前價格是否在倉位範圍內
-  const isInRange = currentTick >= lowerTick && currentTick <= upperTick;
+  const isInRange = currentPrice.greaterThanOrEqualTo(lowerPrice) && currentPrice.lessThanOrEqualTo(upperPrice);
   
-  log(`Position ${position.objectId}: tick range [${lowerTick}, ${upperTick}], current tick: ${currentTick}`);
+  log(`Position ${position.objectId}: price range [${lowerPrice.toFixed(10)}, ${upperPrice.toFixed(10)}], current price: ${currentPrice.toFixed(10)}`);
   log(`Position status: ${isInRange ? '✅ IN RANGE' : '❌ OUT OF RANGE'}`);
   
   return !isInRange;
@@ -259,19 +298,25 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
   let hasOnlyCoinY = false;
   
   // 檢查當前價格相對於舊倉位的位置，判斷會取回哪種幣
-  const currentTick = parseInt(pool.currentTickIndex);
+  const currentPrice = getCurrentPrice(pool);
   
   for (const pos of existingPositions) {
     if (pos.liquidity && !pos.liquidity.isZero()) {
       log(`Removing liquidity from position ${pos.objectId}...`);
       
+      // 獲取倉位的價格範圍
+      const lowerPrice = tickToPrice(pos.lowerTick, pool);
+      const upperPrice = tickToPrice(pos.upperTick, pool);
+      
       // 判斷倉位狀態：價格在區間下方只會取回 coinX，在區間上方只會取回 coinY
-      if (currentTick < pos.lowerTick) {
-        hasOnlyCoinX = true;
-        log(`Position is BELOW range - will receive only TokenX`);
-      } else if (currentTick > pos.upperTick) {
-        hasOnlyCoinY = true;
-        log(`Position is ABOVE range - will receive only TokenY`);
+      if (currentPrice && lowerPrice && upperPrice) {
+        if (currentPrice.lessThan(lowerPrice)) {
+          hasOnlyCoinX = true;
+          log(`Position is BELOW range (current: ${currentPrice.toFixed(10)}, lower: ${lowerPrice.toFixed(10)}) - will receive only TokenX`);
+        } else if (currentPrice.greaterThan(upperPrice)) {
+          hasOnlyCoinY = true;
+          log(`Position is ABOVE range (current: ${currentPrice.toFixed(10)}, upper: ${upperPrice.toFixed(10)}) - will receive only TokenY`);
+        }
       }
       
       // Collect fees first
@@ -779,6 +824,8 @@ module.exports = {
   fetchPoolData,
   calculateTickRange,
   findUserPositions,
+  tickToPrice,
+  getCurrentPrice,
   checkPositionOutOfRange,
   buildRebalanceTransaction,
   executeTransaction,
