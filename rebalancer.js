@@ -21,7 +21,7 @@
  */
 
 
-const envLoader = require('../utils/env-loader');
+const envLoader = require('./env-loader');
 envLoader.load();
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
@@ -750,7 +750,8 @@ async function runAutoRebalance(poolId, options = {}) {
 }
 
 /**
- * 並行執行多個 Pool 的自動換倉檢查
+ * 串行執行多個 Pool 的自動換倉檢查
+ * 注意：必須串行執行，因為同時執行會導致交易衝突（同一個代幣 Object 被多個交易鎖定）
  * @param {Array<string>} poolIds - Pool 合約地址陣列
  * @param {Object} options - 選項
  * @param {boolean} options.dryRun - 是否模擬執行
@@ -766,19 +767,23 @@ async function runAutoRebalanceForMultiplePools(poolIds, options = {}) {
   log('');
   
   try {
-    // 使用 Promise.all 並行執行所有 Pool 的換倉檢查
-    // 確保各 Pool 互不影響（使用 catch 進行隔離）
-    const results = await Promise.all(
-      poolIds.map(poolId =>
-        runAutoRebalance(poolId, options).catch(error => ({
+    // 串行執行每個 Pool 的換倉檢查（避免交易衝突）
+    // 因為多個 Pool 可能共用同一個代幣 Object，並行執行會導致 Object 版本衝突
+    const results = [];
+    for (const poolId of poolIds) {
+      try {
+        const result = await runAutoRebalance(poolId, options);
+        results.push(result);
+      } catch (error) {
+        results.push({
           success: false,
           rebalanceNeeded: null,
           rebalanceExecuted: false,
           error: error.message || 'Unknown error',
           poolId: poolId,
-        }))
-      )
-    );
+        });
+      }
+    }
     
     // 將結果轉換為 { [poolId]: result } 格式
     const resultsByPool = {};
