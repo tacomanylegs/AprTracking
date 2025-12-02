@@ -21,7 +21,7 @@
  */
 
 
-const envLoader = require('../utils/env-loader');
+const envLoader = require('./env-loader');
 envLoader.load();
 const { SuiClient } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
