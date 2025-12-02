@@ -185,8 +185,7 @@ function calculateTickRange(pool, rangePercent) {
   // 這確保邊界 tick 是有效的
   const alignedOffset = Math.ceil(Math.abs(tickOffset) / tickSpacing) * tickSpacing;
   
-  // 以當前 tick 為中心，計算上下邊界，確保對稱性
-  // 需要考慮 currentTick 相對於 tickSpacing 的對齐情況
+  // 以當前 tick 為中心，計算上下邊界
   const alignedLowerTick = currentTick - alignedOffset;
   const alignedUpperTick = currentTick + alignedOffset;
   
