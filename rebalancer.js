@@ -153,6 +153,12 @@ async function fetchPoolData(mmtSdk, poolId) {
 }
 
 // ============ Calculate Tick Range ============
+/**
+ * 計算 tick 範圍（模仿 MMT Finance 前端的預設值邏輯）
+ * @param {Object} pool - Pool 資訊
+ * @param {number} rangePercent - 價格範圍百分比 (例如: 0.0001 = 0.01%)
+ * @returns {Object} { lowerPrice, upperPrice, lowerSqrtPrice, upperSqrtPrice, lowerTick, upperTick }
+ */
 function calculateTickRange(pool, rangePercent) {
   const currentSqrtPrice = new BN(pool.currentSqrtPrice);
   const currentPrice = TickMath.sqrtPriceX64ToPrice(
@@ -163,25 +169,27 @@ function calculateTickRange(pool, rangePercent) {
   
   log(`Current price: ${currentPrice.toString()}`);
   
-  // 獲取當前 tick
+  // 獲取當前 tick 和 tick spacing
   const currentTick = parseInt(pool.currentTickIndex);
   const tickSpacing = pool.tickSpacing || 1;
   
-  // 根據 rangePercent 計算 tick 偏移量
-  // 價格和 tick 的關係: price = 1.0001^tick
-  // 所以 tick = log(price) / log(1.0001)
-  // 如果我們想要 ±rangePercent 的價格範圍，
-  // 對應的 tick 偏移量 = log(1 + rangePercent) / log(1.0001)
-  const tickOffset = Math.abs(Math.log(1 + rangePercent) / Math.log(1.0001));
+  // 計算對應於所需百分比範圍的 tick 偏移量
+  // 原理: 
+  // - 下界: lowerPrice = currentPrice / (1 + rangePercent)
+  // - 上界: upperPrice = currentPrice * (1 + rangePercent)
+  // 因為 price = 1.0001^tick，所以:
+  // tick_offset = log(1 + rangePercent) / log(1.0001)
+  const tickOffset = Math.log(1 + rangePercent) / Math.log(1.0001);
   
-  // 對齊 tick spacing，以當前 tick 為中心對稱
-  const alignedCurrentTick = Math.round(currentTick / tickSpacing) * tickSpacing;
-  const alignedOffset = Math.ceil(tickOffset / tickSpacing) * tickSpacing;
+  // 將 tick offset 對齊到最近的 tickSpacing 倍數（向上取整）
+  // 這確保邊界 tick 是有效的
+  const alignedOffset = Math.ceil(Math.abs(tickOffset) / tickSpacing) * tickSpacing;
   
-  const alignedLowerTick = alignedCurrentTick - alignedOffset;
-  const alignedUpperTick = alignedCurrentTick + alignedOffset;
+  // 以當前 tick 為中心，計算上下邊界
+  const alignedLowerTick = currentTick - alignedOffset;
+  const alignedUpperTick = currentTick + alignedOffset;
   
-  // 計算對應的價格範圍
+  // 計算邊界價格
   const lowerSqrtPrice = TickMath.tickIndexToSqrtPriceX64(alignedLowerTick);
   const upperSqrtPrice = TickMath.tickIndexToSqrtPriceX64(alignedUpperTick);
   
@@ -196,8 +204,13 @@ function calculateTickRange(pool, rangePercent) {
     pool.tokenY?.decimals || 6
   );
   
-  log(`Target tick range: ${alignedLowerTick} - ${alignedUpperTick} (center: ${alignedCurrentTick}, offset: ±${alignedOffset}, spacing: ${tickSpacing})`);
+  // 計算實際百分比範圍（用於驗證）
+  const actualLowerPercent = ((currentPrice - lowerPrice) / currentPrice * 100).toFixed(4);
+  const actualUpperPercent = ((upperPrice - currentPrice) / currentPrice * 100).toFixed(4);
+  
+  log(`Target tick range: [${alignedLowerTick}, ${alignedUpperTick}] (width: ±${alignedOffset} ticks, spacing: ${tickSpacing})`);
   log(`Target price range: ${lowerPrice.toFixed(10)} - ${upperPrice.toFixed(10)}`);
+  log(`Actual range: -${actualLowerPercent}% to +${actualUpperPercent}% (requested: ±${(rangePercent * 100).toFixed(4)}%)`);
   
   return {
     lowerPrice: lowerPrice.toString(),
