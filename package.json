@@ -10,8 +10,10 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "@google-cloud/kms": "^4.5.0",
         "@mmt-finance/clmm-sdk": "^1.0.0",
         "@mysten/sui": "^1.28.2",
+        "@noble/hashes": "^2.0.1",
         "bn.js": "^5.2.1",
         "decimal.js": "^10.4.3",
         "dotenv": "^17.2.3",

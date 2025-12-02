@@ -24,17 +24,16 @@
 const envLoader = require('./env-loader');
 envLoader.load();
 const { SuiClient } = require('@mysten/sui/client');
-const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
-const { decodeSuiPrivateKey } = require('@mysten/sui/cryptography');
 const { Transaction } = require('@mysten/sui/transactions');
 const { MmtSDK, TickMath } = require('@mmt-finance/clmm-sdk');
 const BN = require('bn.js');
 const Decimal = require('decimal.js');
+const { initializeKmsSigner, createSuiKmsSigner } = require('./gcp-kms-signer');
 
 // ============ Configuration ============
 const CONFIG = {
-  // 從 .env 讀取
-  privateKey: process.env.SUI_PRIVATE_KEY,
+  // 從 .env 讀取 GCP KMS 金鑰路徑
+  kmsKeyPath: process.env.GCP_KMS_KEY_PATH,
   // poolId 可從環境變數或調用時傳入
   rpcUrl: 'https://fullnode.mainnet.sui.io',
   defaultRangePercent: parseFloat(process.env.DEFAULT_RANGE_PERCENT || '0.0001'),
@@ -91,8 +90,8 @@ function parseArgs() {
   return options;
 }
 
-// ============ Initialize SDK & Keypair ============
-function initializeSDK(requirePrivateKey = true) {
+// ============ Initialize SDK & KMS Signer ============
+async function initializeSDK(requireSigner = true) {
   // 建立 Sui Client
   const suiClient = new SuiClient({ url: CONFIG.rpcUrl });
   
@@ -102,35 +101,21 @@ function initializeSDK(requirePrivateKey = true) {
     client: suiClient,
   });
   
-  // 如果不需要私鑰（例如只讀操作）
-  if (!requirePrivateKey) {
-    return { suiClient, mmtSdk, keypair: null, address: null };
+  // 如果不需要簽署（例如只讀操作）
+  if (!requireSigner) {
+    return { suiClient, mmtSdk, signer: null, address: null };
   }
   
-  if (!CONFIG.privateKey) {
-    throw new Error('SUI_PRIVATE_KEY not set in .env');
+  if (!CONFIG.kmsKeyPath) {
+    throw new Error('GCP_KMS_KEY_PATH not set in .env');
   }
   
-  // 解析私鑰 (支援 suiprivkey、hex 或 base64)
-  let keypair;
-  let privateKeyStr = CONFIG.privateKey.trim();
+  // 初始化 GCP KMS 簽署器
+  const kmsConfig = await initializeKmsSigner(CONFIG.kmsKeyPath);
+  const signer = createSuiKmsSigner(kmsConfig);
+  const address = kmsConfig.address;
   
-  try {
-    // 如果是 suiprivkey 格式，使用標準解碼
-    if (privateKeyStr.startsWith('suiprivkey')) {
-      const { secretKey } = decodeSuiPrivateKey(privateKeyStr);
-      keypair = Ed25519Keypair.fromSecretKey(secretKey);
-    } 
-    else {
-      throw new Error('Failed to parse private key: invalid format (expected suiprivkey)');
-    }
-  } catch (e) {
-    throw new Error('Failed to parse private key: invalid format (expected suiprivkey)');
-  }
-  
-  const address = keypair.getPublicKey().toSuiAddress();
-  
-  return { suiClient, mmtSdk, keypair, address };
+  return { suiClient, mmtSdk, signer, address };
 }
 
 // ============ Fetch Pool Data ============
@@ -474,12 +459,15 @@ async function buildRebalanceTransaction(mmtSdk, suiClient, address, pool, tickR
 }
 
 // ============ Execute Transaction ============
-async function executeTransaction(suiClient, keypair, txb, dryRun = false) {
+async function executeTransaction(suiClient, signer, txb, dryRun = false) {
+  // 建構交易 bytes
+  const txBytes = await txb.build({ client: suiClient });
+  
   if (dryRun) {
     log('DRY RUN - Simulating transaction...');
     
     const dryRunResult = await suiClient.dryRunTransactionBlock({
-      transactionBlock: await txb.build({ client: suiClient }),
+      transactionBlock: txBytes,
     });
     
     if (dryRunResult.effects?.status?.status === 'success') {
@@ -494,10 +482,13 @@ async function executeTransaction(suiClient, keypair, txb, dryRun = false) {
   
   log('Executing transaction...');
   
-  // 使用 Ed25519Keypair 簽署交易
-  const result = await suiClient.signAndExecuteTransaction({
-    signer: keypair,
-    transaction: txb,
+  // 使用 KMS 簽署交易
+  const signature = await signer.signTransaction(txBytes);
+  
+  // 執行已簽署的交易
+  const result = await suiClient.executeTransactionBlock({
+    transactionBlock: txBytes,
+    signature: signature,
     options: {
       showEffects: true,
       showEvents: true,
@@ -528,7 +519,7 @@ async function main() {
   
   try {
     // 1. 初始化
-    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    const { suiClient, mmtSdk, signer, address } = await initializeSDK(true);
     log(`Wallet address: ${address}`);
     
     // 2. 獲取 Pool 資料
@@ -588,7 +579,7 @@ async function main() {
     );
     
     // 7. 執行交易
-    const result = await executeTransaction(suiClient, keypair, txb, options.dryRun);
+    const result = await executeTransaction(suiClient, signer, txb, options.dryRun);
     
     // 8. 輸出結果
     log('');
@@ -661,7 +652,7 @@ async function runAutoRebalance(poolId, options = {}) {
   
   try {
     // 1. 初始化
-    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    const { suiClient, mmtSdk, signer, address } = await initializeSDK(true);
     log(`Wallet address: ${address}`);
     
     // 2. 獲取 Pool 資料
@@ -724,7 +715,7 @@ async function runAutoRebalance(poolId, options = {}) {
     );
     
     // 7. 執行交易
-    const result = await executeTransaction(suiClient, keypair, txb, opts.dryRun);
+    const result = await executeTransaction(suiClient, signer, txb, opts.dryRun);
     
     // 8. 輸出結果
     log('');
@@ -858,7 +849,7 @@ async function closeAllPositions(poolIds, options = {}) {
   
   try {
     // 1. 初始化
-    const { suiClient, mmtSdk, keypair, address } = initializeSDK(true);
+    const { suiClient, mmtSdk, signer, address } = await initializeSDK(true);
     log(`Wallet address: ${address}`);
     log('');
     
@@ -987,7 +978,7 @@ async function closeAllPositions(poolIds, options = {}) {
         }
         
         // 4. 執行交易
-        const result = await executeTransaction(suiClient, keypair, txb, dryRun);
+        const result = await executeTransaction(suiClient, signer, txb, dryRun);
         
         if (result.success) {
           logSuccess(`Successfully closed ${closedCount} position(s) in pool ${poolId}`);
